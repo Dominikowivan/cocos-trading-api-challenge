@@ -1,15 +1,15 @@
 # Cocos Challenge!
 
 Hola a todos, soy Ivan!
-Voy a estar haciendo un poco de journaling para evidenciar mi criterio técnico. Este journal está escrito por un humano, para humanos, y tiene como principal propósito comunicar mi intención técnica y servirme a mi como herramienta de análisis, comprensión y diseño.
-Cualquier plan o decisión que tomé en el journal no es final. Es solo la comunicación de mi intención y razonamiento en ese punto del proyecto.
+Voy a estar haciendo un poco de journaling para evidenciar mi criterio técnico. Este journal está escrito por un humano, para humanos, y tiene como principal propósito comunicar mi intención técnica y servirme a mí como herramienta de análisis, comprensión y diseño.
+Cualquier plan o decisión que tome en el journal no es final. Es solo la comunicación de mi intención y razonamiento en ese punto del proyecto.
 Voy a avanzar el proyecto siguiendo el principio de lo que importante es tener un plan, no seguirlo a rajatabla. A medida que vaya iterando sobre el proyecto, pueden hacerse obvias divergencias que en un principio no lo eran, y mi intención es bienvenirlas así vayan apareciendo.
 
 Aclaro que en el desarrollo del proyecto pienso utilizar inteligencia artificial con el uso de Spec driven development a modo de que cada paso de planeamiento, diseño y desarrollo este debidamente consensuado y documentado. Pero algo que no hace bien la inteligencia artificial es demostrar intención humana, que al final del día es lo que estará siendo evaluado con este ejercicio.
 
 # Enunciado y primeras decisiones.
 
-Bueno, como en todo proyecto, las primeras decisiones se toman sin que haya todavía ni una sola línea de código. Voy a comenzar con un relevamiento de las cosas que se sobre Cocos.
+Bueno, como en todo proyecto, las primeras decisiones se toman sin que haya todavía ni una sola línea de código. Voy a comenzar con un relevamiento de las cosas que sé sobre Cocos.
 
 ## Mail en el cual se envió el challenge
 
@@ -19,7 +19,7 @@ La primera limitación técnica fue impuesta en el mail en el que recibí el cha
 
 Así que vamos con Java. Voy con Java 21 por el simple hecho de que es la última versión de java con la que ya venía trabajando y con la que me siento comodo. Podríamos ir con java 25 pero no quiero depender de features que no voy a usar.
 
-## JD Y lo que se sobre Cocos
+## JD y lo que sé sobre Cocos
 
 Después, como supuesto tomaré que esta es una api que se construirá sobre el ambiente de trabajo de Cocos. Yo sé que Cocos es una fintech, un lugar donde se maneja y se mueve plata. Esto ya me da pauta de que la seguridad, integridad y trazabilidad de datos va a ser un norte que voy a tener que tener en mente a la hora de tomar decisiones técnicas.
 
