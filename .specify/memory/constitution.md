@@ -1,5 +1,19 @@
 <!--
 Sync Impact Report
+- Version change: 1.1.2 → 1.2.0 (MINOR: materially expanded guidance on the challenge statement)
+- Modified sections:
+  - Technology and Scope Constraints — adds the challenge statement
+    (docs/challenge/backend-challenge.md) as the verbatim source of requirements; departures
+    from it now require an ADR as well as a README note; requirements from the statement MUST
+    NOT be restated in this constitution. Closes the gap in VII, which required departures to be
+    stated in the README but did not say where the statement lives.
+- Modified principles: none
+- Added sections: none
+- Removed sections: none
+- Templates: not modified (they read this file at runtime)
+- Deferred TODOs: none
+
+Previous report (1.1.2, 2026-11-15)
 - Version change: 1.1.1 → 1.1.2 (PATCH: clarifies the existing ADR workflow)
 - Modified principles:
   - VII. Code Carries No Comments; Reasoning Lives in Documents — adds the rule that adding or
@@ -171,6 +185,11 @@ dependency pointing inward absorbs them without rewrites.
   is born `NEW` and leaves it only by cancellation; a `MARKET` order fills at the last close.
   Features MUST NOT assume `LIMIT` orders stay `NEW` forever.
 - Without authentication the user id is untrusted input: every query MUST be scoped by it.
+- The challenge statement in `docs/challenge/backend-challenge.md` is the source of
+  requirements, kept verbatim. Where this constitution or the implementation departs from it,
+  the departure MUST be recorded in an ADR and stated in the README. This constitution MUST NOT
+  restate requirements from the statement: the statement is input, not a rule, and a copy here
+  would drift from it.
 
 ## Development Workflow
 
@@ -196,4 +215,4 @@ dependency pointing inward absorbs them without rewrites.
 - Compliance is checked at plan time (Constitution Check) and at review. Runtime guidance for
   developers lives in `README.md` and `docs/adr/`.
 
-**Version**: 1.1.2 | **Ratified**: 2026-11-15 | **Last Amended**: 2026-11-15
+**Version**: 1.2.0 | **Ratified**: 2026-11-15 | **Last Amended**: 2026-11-15

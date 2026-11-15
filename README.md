@@ -11,6 +11,7 @@ behind the solution, not only the solution. So here is the map.
 
 | Path | What it holds |
 |---|---|
+| [`docs/challenge/`](docs/challenge) | The statement this solution answers, kept verbatim so requirements can be cited instead of paraphrased |
 | [`docs/journal/`](docs/journal) | **The intent journal. Start here.** Every decision, in the order it was taken, with what was known at the time |
 | [`docs/adr/`](docs/adr) | Architecture Decision Records: one file per decision, with the alternatives that were discarded |
 | `src/main/java` | Application code |
@@ -100,9 +101,10 @@ export COCOS_DB_PASSWORD="<password>"
 
 ## Attribution
 
-The statement and the schema and seed of the database are not mine: they were provided by Cocos
-Capital and published at https://github.com/cocos-capital/cocos-challenge. The Flyway migrations
-under `src/main/resources/db/migration` are a transcription of that `database.sql`.
+The statement, the schema and the seed data are not mine: they were provided by Cocos Capital and
+published at https://github.com/cocos-capital/cocos-challenge. `docs/challenge/backend-challenge.md`
+is a verbatim copy of that statement, taken from commit `abae7701`, and the Flyway migrations under
+`src/main/resources/db/migration` are a transcription of that `database.sql`.
 
 <!-- ───────────── DELETE BEFORE DELIVERY ─────────────
 Pending, so the README never claims something that is not true yet:
