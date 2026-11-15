@@ -17,7 +17,8 @@ behind the solution, not only the solution. So here is the map.
 | `src/test/java` | Tests |
 | `src/main/resources/db/migration` | Flyway migrations: the schema as it was provided, plus every change made to it |
 | `src/main/resources/db/seed` | The provided dataset, loaded only by the `local` profile and by the tests |
-| `.specify/` | Spec Driven Development tooling (see ADR-0008): versioned because it is part of the development contract, like the linter or the CI pipeline |
+| `.specify/` | Spec Driven Development tooling (see ADR-0008): versioned because it is part of the development contract, like the linter or the CI pipeline. The project's rules live in [`.specify/memory/constitution.md`](.specify/memory/constitution.md) |
+| `.claude/` | The agent skills that drive that workflow, versioned so every developer works with the same ones |
 
 > The journal is the only document written in Spanish. It is addressed to the people reviewing
 > this exercise, and what it communicates is intent, not documentation.
@@ -106,8 +107,5 @@ under `src/main/resources/db/migration` are a transcription of that `database.sq
 <!-- ───────────── DELETE BEFORE DELIVERY ─────────────
 Pending, so the README never claims something that is not true yet:
  - no endpoint is implemented; the paths above are a proposal to be confirmed
- - `.specify/` does not exist yet: Spec Kit is installed right after the first commit
  - no migration yet for `order_status_history` or for the indexes
- - the journal index announces a "Uso de inteligencia artificial" section that is never opened:
-   write it or drop it from the index
 ──────────────────────────────────────────────────── -->
