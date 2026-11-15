@@ -21,6 +21,5 @@ currently holds; the journal is the authority on how it was reached.**
 | [0009](0009-flyway-and-provided-database-as-staging.md) | Flyway, and the provided database treated as staging | Accepted |
 | [0010](0010-testcontainers-with-postgresql-18.md) | Tests and local development run on the same PostgreSQL as staging | Accepted |
 | [0011](0011-ci-with-github-actions-and-jacoco.md) | CI on GitHub Actions, with coverage reported | Accepted |
-
-ADR-0002 is the one the others hang from: once the balance is derived rather than stored, the
-reservation in 0004, the history in 0005 and the cancellation in 0006 all follow from it.
+| [0012](0012-ledger-anomalies-are-reported-not-hidden.md) | A ledger anomaly is served as-is and logged as an error | Accepted |
+| [0013](0013-unknown-money-is-absent-never-zero.md) | An unknown money figure is absent, never zero | Accepted |
