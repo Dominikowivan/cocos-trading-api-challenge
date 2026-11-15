@@ -66,3 +66,29 @@ What we need to know: Is a request for a non-existent user id rejected as not fo
 
 404 not found. Por defecto para cualquier busqueda por id no encontrada.
 
+Listo, vamos al plan y revisarlo.
+
+# Summary: 
+
+Me propuso hacer 3 queries.
+1- Existencia del usuario: OK. Es una validacion clasica.
+2- Traerse todas las ordenes, en cualquier estado, como entidades JPA completas (eeeeh, es necesario?)
+Por cada orden, en base a su estado y lado decide que hacer. (Me parece OK que esto recida en la app, logica de negocio)
+3- Trae el ultimo precio de las acciones para armar la info de los activos.
+
+Lo que me parece bien: 
+Reglas de negocio en java, la existencia de usuario para decidir si cortar ahi o no.
+Repeatable_read en el transaction. Como hacemos multiples reads, es mejor hacerlos sobre un snapshot. De otra forma puede quedar inconsistente.
+
+Lo que no me parece bien:
+-Traer ordenes que no usa, las canceled y rejected no aportan nada. 
+
+Lo que queda a revisar una vez genere el codigo:
+Las ordenes que trae, las pasa a java. Van a encapsular logica de negocio o van a ser solo datos de lectura? por que armar objetos java, solo para leerlos y que no tengan logica
+es estado manejado sin sentido. Con records bastaria si es ese caso. 
+
+Corregi el plan con la observacion de las ordenes que no tiene sentido traerse y lo acepto.
+
+El resto en el plan queda muy en abstracto, prefiero revisar el codigo y hacer correcciones una vez generado (siempre antes de commitear).
+
+Corro tasks, implement, y vamos a ver.
