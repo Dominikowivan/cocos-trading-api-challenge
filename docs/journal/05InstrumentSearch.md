@@ -33,3 +33,7 @@ Max query lenght 64.
 
 Hacer una busqueda si quedo en algun lado otro "por defecto" configurable para pasar a env param. Lo dejo para el refactor del endpoint de portfolio.
 Lo mismo, ver de poner validacion al request de de portfolio.
+
+Falta revisar si falta agregar algun tipo de indice para mejorar la busqueda.
+Para eso, no se si tickername deberia ser unique. Frente a esa duda, prefiero no forzar una regla de negocio que desconozco, se consultaria a un experto de negocio/producto en un proyecto real.
+
