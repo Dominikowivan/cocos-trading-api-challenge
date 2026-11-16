@@ -14,7 +14,9 @@ behind the solution, not only the solution. So here is the map.
 | [`docs/challenge/`](docs/challenge) | The statement this solution answers, kept verbatim so requirements can be cited instead of paraphrased |
 | [`docs/journal/`](docs/journal) | **The intent journal. Start here.** Every decision, in the order it was taken, with what was known at the time |
 | [`docs/adr/`](docs/adr) | Architecture Decision Records: one file per decision, with the alternatives that were discarded |
+| [`docs/api/openapi.yaml`](docs/api/openapi.yaml) | The API contract as it is today. Every response in the web tests is validated against it (ADR-0024) |
 | [`docs/api/trading-api.http`](docs/api/trading-api.http) | Example requests with their expected figures, runnable from IntelliJ's HTTP Client or VS Code's REST Client |
+| [`specs/`](specs) | One folder per feature, written with Spec Kit before the code. Its `contracts/` keeps the API as that feature designed it, and is not edited afterwards |
 | `src/main/java` | Application code |
 | `src/test/java` | Tests |
 | `src/main/resources/db/migration` | Flyway migrations: the schema as it was provided, plus every change made to it |

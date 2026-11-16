@@ -10,7 +10,7 @@ import com.cocos.trading.TestcontainersConfiguration;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import(TestcontainersConfiguration.class)
+@Import({ TestcontainersConfiguration.class, ContractValidationConfiguration.class })
 abstract class WebTestBase {
 
 	protected static final String PORTFOLIO = "/api/v1/users/{userId}/portfolio";

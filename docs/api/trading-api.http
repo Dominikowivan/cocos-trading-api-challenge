@@ -6,8 +6,8 @@
 # Prerequisites: docker compose --profile app up --build
 # Expected figures and the reasoning behind them:
 #   specs/001-portfolio-endpoint/quickstart.md
-# Response contract:
-#   specs/001-portfolio-endpoint/contracts/portfolio.openapi.yaml
+# Response contract, enforced by the web tests (ADR-0024):
+#   docs/api/openapi.yaml
 #
 # Only the portfolio endpoint exists so far; instrument search, order submission and
 # cancellation get their own sections as those features land.

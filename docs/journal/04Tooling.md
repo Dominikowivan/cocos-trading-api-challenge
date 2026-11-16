@@ -29,6 +29,9 @@ De ser necesario en el futuro para comodidad de otros equipos, se agrega fácilm
 Lo que sí: deberíamos armar el Postman collection directamente a partir de la especificación OpenAPI que generan los specs, y dejar listado
 como parte del entregable de cada feature la modificación de esa collection.
 
+Dejamos como contrato el OpenAPI configurado en docs/api, y agregamos una librería para verificar que la estructura de lo que está en esa documentación
+es siempre válida.
+
 Vamos con esto, no paso por Spec Kit porque son requerimientos técnicos. Van a dejar ADR seguro, y eso más la intención de este journal funcionan ya como suficiente documentación.
 
 # Dockerfile
