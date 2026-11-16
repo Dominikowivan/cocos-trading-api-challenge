@@ -9,20 +9,27 @@ Para que las reglas de arquitectura que establecimos se respeten.
 
 # Formatter
 Consistencia che, que corra un check en el CI de que todo lo que se pushea cumpla con el check.
-Vamos a ir con el spring java format. El proyecto es principalmente springboot, y deliberadamente seguimos las versiones
-que van en el BOM. Pienso que es lo mas consistente y coherente mantenernos en el framework.
+Vamos a ir con el Spring Java Format. El proyecto es principalmente Spring Boot, y deliberadamente seguimos las versiones
+que van en el BOM. Pienso que es lo más consistente y coherente mantenernos en el framework.
 
 # Sonar
-Revision estatica de codigo para agregar al CI. No empecemos a acumular issues y deuda tecnica.
-Perfecto! hubo que tunear un par de configs pero salio andando y encontro 4 issues con los que estoy de acuerdo. Fixed y pusheados.
+Revisión estática de código para agregar al CI. No empecemos a acumular issues y deuda técnica.
+¡Perfecto! Hubo que tunear un par de configs, pero salió andando y encontró 4 issues con los que estoy de acuerdo. Fixed y pusheados.
 
-# Documentacion de la api
-Estaba pensando swagger, pero si en el entregable damos un postman collection como pide el mail, esto no va a hacer falta.
-De ser necesario en el futuro para comodidad de otros equipos, se agrega facilmente con anotaciones en el controller.
-Lo que si: Deberiamos armar el postman collection directamente a partir de la especificacion openapi que generan los specs, y dejar listado
-como parte del entregable de cada feature la modificacion de esa collection.
+# Análisis de vulnerabilidades - Trivy
+Sonar ya cubre vulnerabilidades de código y estáticas del proyecto, pero falta vulnerabilidades de dependencias/librerías.
+Agregué Trivy para levantar CVEs.
+Esto corre como parte del proceso de build en el CI, pero no nos defiende si algo que ya está en producción es vulnerado.
+Para eso necesitaríamos una herramienta de análisis y alerta tipo Dependabot, pero como esto no va a vivir realmente en producción
+y tampoco quiero las alertas siendo mandadas a mi mail de un proyecto que se entrega y muere, no lo voy a agregar.
 
-Vamos con esto, no paso por spec-kit por que son requerimientos tecnicos. Van a dejar adr seguro, y eso mas la intencion de este journal funcionan ya como suficiente documentacion.
+# Documentación de la API
+Estaba pensando Swagger, pero si en el entregable damos un Postman collection como pide el mail, esto no va a hacer falta.
+De ser necesario en el futuro para comodidad de otros equipos, se agrega fácilmente con anotaciones en el controller.
+Lo que sí: deberíamos armar el Postman collection directamente a partir de la especificación OpenAPI que generan los specs, y dejar listado
+como parte del entregable de cada feature la modificación de esa collection.
 
-# Metricas
+Vamos con esto, no paso por Spec Kit porque son requerimientos técnicos. Van a dejar ADR seguro, y eso más la intención de este journal funcionan ya como suficiente documentación.
+
+# Métricas
 TBD

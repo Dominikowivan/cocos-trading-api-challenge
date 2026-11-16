@@ -32,3 +32,4 @@ currently holds; the journal is the authority on how it was reached.**
 | [0020](0020-static-analysis-on-sonarqube-cloud.md) | Static analysis on SonarQube Cloud, gating develop | Accepted; partly superseded by [0021](0021-the-quality-gate-blocks-pull-requests.md) |
 | [0021](0021-the-quality-gate-blocks-pull-requests.md) | The quality gate blocks pull requests, not pushes to develop | Accepted |
 | [0022](0022-sonar-way-comprehensive-profile.md) | Java is analysed with the Sonar way comprehensive profile | Accepted |
+| [0023](0023-dependency-and-secret-scanning-with-trivy.md) | Dependencies and secrets are scanned with Trivy in CI | Accepted |
