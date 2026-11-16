@@ -82,6 +82,12 @@ export COCOS_DB_PASSWORD="<password>"
 ./mvnw test
 ```
 
+The build fails on unformatted code. To format it:
+
+```bash
+./mvnw spring-javaformat:apply
+```
+
 ## Endpoints
 
 | Method | Path | What it does |

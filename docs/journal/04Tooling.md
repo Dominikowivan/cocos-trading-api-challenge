@@ -9,6 +9,8 @@ Para que las reglas de arquitectura que establecimos se respeten.
 
 # Formatter
 Consistencia che, que corra un check en el CI de que todo lo que se pushea cumpla con el check.
+Vamos a ir con el spring java format. El proyecto es principalmente springboot, y deliberadamente seguimos las versiones
+que van en el BOM. Pienso que es lo mas consistente y coherente mantenernos en el framework.
 
 # Sonar
 Revision estatica de codigo y vulnerabilidades Para agregar al CI. No empecemos a acumular issues y deuda tecnica.
