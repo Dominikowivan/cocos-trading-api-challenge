@@ -33,3 +33,4 @@ currently holds; the journal is the authority on how it was reached.**
 | [0021](0021-the-quality-gate-blocks-pull-requests.md) | The quality gate blocks pull requests, not pushes to develop | Accepted |
 | [0022](0022-sonar-way-comprehensive-profile.md) | Java is analysed with the Sonar way comprehensive profile | Accepted |
 | [0023](0023-dependency-and-secret-scanning-with-trivy.md) | Dependencies and secrets are scanned with Trivy in CI | Accepted |
+| [0025](0025-the-api-runs-in-docker.md) | The API runs in Docker with one command | Accepted |
