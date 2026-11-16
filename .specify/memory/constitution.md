@@ -1,5 +1,63 @@
 <!--
 Sync Impact Report
+- Version change: 2.0.0 → 2.1.0 (MINOR: materially expanded guidance)
+- Modified principles:
+  - V. Tests Run on the Real Engine — every behaviour a feature adds MUST be tested at the level
+    where it lives; tests are part of the definition of done, never optional; test-first is
+    allowed, not required. Closes the gap between "testable" and "tested", which let Spec Kit's
+    default ("tests are optional unless requested") apply
+  - IX. Design for Change — "new abstraction needs a second real use" narrowed to extension points
+    (a value type naming a domain concept, such as `Closes`, needs none); a method never takes an
+    `Optional`. Also adds the function-level rule (one thing, one level of abstraction, a
+    public method reads as the summary of its steps, steps below in call order) and the rule that a
+    structure chosen for performance must cite a measurement; rationale extended
+- Modified sections:
+  - Development Workflow — design documents specify contracts and rules, not the shape of the
+    code; every user story ends with a refactor task reviewed against IX
+- Added sections: none
+- Removed sections: none
+- Templates: the project override `.specify/templates/overrides/tasks-template.md` adds a refactor
+  task per story and marks tests as required; the `speckit-tasks` skill's "tests are optional"
+  rule is replaced with a pointer to principle V. Both are re-applied by hand after a Spec Kit
+  upgrade
+- Origin: the first `AccountLedger` was one interleaved loop because research R-004, ADR-0015 and
+  data-model prescribed "one pass"; it passed the Constitution Check because nothing in IX spoke
+  at method level, and no refactor step existed without TDD
+- Deferred TODOs: none
+
+Previous report (2.0.0, 2026-11-15)
+- Version change: 1.2.0 → 2.0.0 (MAJOR: principle VIII redefined)
+- Modified principles:
+  - VIII. Ports and Adapters → VIII. Layers: Controller, Service, Model, Persistence. The service
+    orchestrates persistence and model; the model holds no reference to persistence (no
+    repositories, no ports) and returns what it detects as values. Persistence is Spring Data
+    repositories over JPA entities with hand-written mappers. Decision recorded in ADR-0017.
+  - I. The Ledger Is the Single Source of Truth — "one domain service owns the fold" becomes "one
+    model object owns the fold", fed by the service
+  - III, V — "domain code/logic" reads "model code/logic"
+  - IX. Design for Change — dependency direction restated for layers; rationale adjusted
+- Added sections: none
+- Removed sections: none
+- Templates: not modified (they read this file at runtime)
+- Follow-up: feature 001 plan, research and data-model, and ADR-0015, cite the old shape and are
+  updated in the same change
+- Deferred TODOs: none
+
+Previous report (1.2.0, 2026-11-15)
+- Version change: 1.1.2 → 1.2.0 (MINOR: materially expanded guidance on the challenge statement)
+- Modified sections:
+  - Technology and Scope Constraints — adds the challenge statement
+    (docs/challenge/backend-challenge.md) as the verbatim source of requirements; departures
+    from it now require an ADR as well as a README note; requirements from the statement MUST
+    NOT be restated in this constitution. Closes the gap in VII, which required departures to be
+    stated in the README but did not say where the statement lives.
+- Modified principles: none
+- Added sections: none
+- Removed sections: none
+- Templates: not modified (they read this file at runtime)
+- Deferred TODOs: none
+
+Previous report (1.1.2, 2026-11-15)
 - Version change: 1.1.1 → 1.1.2 (PATCH: clarifies the existing ADR workflow)
 - Modified principles:
   - VII. Code Carries No Comments; Reasoning Lives in Documents — adds the rule that adding or
@@ -50,8 +108,9 @@ Previous report (1.0.0, 2026-11-15)
 - `orders` is the ledger. Positions, cash balance and available cash MUST be computed from it
   when read; no positions table, balance column or other stored copy of derived state may be
   added.
-- Exactly one domain service owns the fold over the ledger. The portfolio endpoint and order
-  validation MUST both consume it; computing available cash a second way is forbidden.
+- Exactly one model object owns the fold over the ledger: the service reads the entries and hands
+  them to it. The portfolio endpoint and order validation MUST both obtain their figures from it;
+  computing available cash a second way is forbidden.
 - Available cash is the balance minus everything reserved by `NEW` orders (cash for `BUY`,
   shares for `SELL`). Order validation MUST check against available cash and available holdings,
   never against the raw balance.
@@ -72,7 +131,7 @@ and `1.00` as different values.
 ### III. Business Logic Lives in Java, Not in the Database
 
 - Business rules (validation, the ledger fold, reservations, returns, state transitions) MUST be
-  implemented in Java domain code.
+  implemented in Java model code.
 - Triggers, stored procedures and functions MUST NOT carry business rules. SQL is for reading,
   writing and aggregating data; schema constraints that protect integrity are allowed.
 
@@ -94,14 +153,19 @@ serialisation protects nothing. See ADR-0004, 0005, 0006.
 
 ### V. Tests Run on the Real Engine, Never on Staging
 
-- Domain logic MUST be testable as plain Java, with no database and no Spring context.
+- Model logic MUST be testable as plain Java, with no database, no Spring context and no test
+  doubles: a model test builds its input data and asserts on the returned value.
 - Tests that need a database MUST use Testcontainers with `postgres:18.7`, built from the same
   Flyway migrations and seed as local development. H2, embedded databases and mocked repositories
   MUST NOT stand in for PostgreSQL in persistence or functional tests.
 - No test may connect to the provided (staging) database.
+- Every behaviour a feature adds MUST be covered by tests at the level where it lives: model
+  rules in plain Java, persistence and HTTP on Testcontainers. Tests are part of a story's
+  definition of done and are never optional; writing them first is allowed, not required.
 - Every feature MUST ship with tests for its rejection paths, not only its happy path.
 
-Rationale: a green suite on a different engine is evidence about the wrong system.
+Rationale: a green suite on a different engine is evidence about the wrong system, and code with
+no test is a claim nobody checked.
 See ADR-0010.
 
 ### VI. Schema Changes Only Through Migrations; Staging Is Protected
@@ -131,19 +195,27 @@ Rationale: the exercise evaluates the reasoning, so it must live where reviewers
 stay true to the order in which it happened. The ADR index is how a reader finds the
 decisions, so an ADR missing from it is an ADR nobody will read.
 
-### VIII. Ports and Adapters
+### VIII. Layers: Controller, Service, Model, Persistence
 
-- The domain package MUST NOT import Spring, Jakarta, JPA or any web or persistence type. It
-  depends on interfaces it declares itself.
-- Persistence and HTTP are adapters: JPA entities and request/response DTOs live in the adapter
-  layer and MUST NOT leak into domain signatures.
-- A port is introduced when there is a real boundary (persistence, HTTP, time, external
-  services), not for every class. An interface with exactly one implementation and no boundary
-  behind it MUST NOT be created.
-- Mapping between JPA entities and the domain model is written by hand in the adapter.
+- A request flows controller → service. The service is the only layer that orchestrates: it reads
+  through persistence, maps what it read into model objects, asks the model to compute, performs
+  the side effects (writing, logging) and returns model objects to the controller.
+- The model is plain Java. It MUST NOT import Spring, Jakarta, JPA or any web or persistence type,
+  and MUST NOT hold a reference to a repository, a service or any interface standing in for one. It
+  receives data and returns data; what it detects (an anomaly, a rejection reason) it returns as
+  a value for the service to act on.
+- Persistence is Spring Data repositories over JPA entities. Entities leave the persistence
+  package only through a mapper; mapping between entities and the model is written by hand.
+- The controller only translates HTTP: it reads the request, calls one service method and maps
+  the returned model into a response DTO. Request and response DTOs MUST NOT appear in service or
+  model signatures.
+- An interface is created only when the framework needs one (a Spring Data repository) or there
+  are two real implementations. A service with one implementation is a class.
 
-Rationale: principle V already requires the domain to be testable without Spring or a database;
-this is the structure that makes it true instead of aspirational.
+Rationale: the path of a request reads top to bottom in one service method, and principle V holds
+without test doubles because the model never reaches out. In 1.x (ports and adapters) model
+objects fetched their own data through ports, which scattered the orchestration across them.
+See ADR-0017.
 
 ### IX. Design for Change
 
@@ -152,12 +224,23 @@ this is the structure that makes it true instead of aspirational.
   its data to decide for them.
 - A rule exists in exactly one place. Duplicated business logic MUST be extracted; duplicated
   structure MAY be left alone.
-- Each class has one reason to change, and dependencies point toward the domain.
-- New abstraction is justified by a second real use, not by an anticipated one.
+- Each class has one reason to change. Dependencies go controller → service → model and
+  persistence; the model depends on nothing in the application.
+- New extension points (interfaces, hooks, configuration) are justified by a second real use, not
+  by an anticipated one. A value type that names a domain concept needs no second use.
+- A method never takes an `Optional`: absence is resolved by the caller (`map`, `flatMap`) or
+  returned.
+- A method does one thing at one level of abstraction. A public method reads as the summary of
+  its steps; the steps are private methods that follow it in the order they are called.
+- Structure chosen for performance (a single pass, a cache, a denormalisation) MUST cite a
+  measurement that justifies it. Without one, the more readable structure wins.
 
 Rationale: the cost of this codebase is in the changes it will need later (a matching engine,
-authentication, a snapshot of the ledger); code that keeps each rule in one place and each
-dependency pointing inward absorbs them without rewrites.
+authentication, a snapshot of the ledger); code that keeps each rule in one place and a model
+that depends on nothing absorbs them without rewrites. Code is read far more often than it is
+written, and the evaluation of this exercise is a reading of it: a rule that can only be found by
+untangling four interleaved accumulators is a rule a reviewer will not find. An optimisation
+nobody measured costs that readability and buys nothing anyone can show.
 
 ## Technology and Scope Constraints
 
@@ -171,6 +254,11 @@ dependency pointing inward absorbs them without rewrites.
   is born `NEW` and leaves it only by cancellation; a `MARKET` order fills at the last close.
   Features MUST NOT assume `LIMIT` orders stay `NEW` forever.
 - Without authentication the user id is untrusted input: every query MUST be scoped by it.
+- The challenge statement in `docs/challenge/backend-challenge.md` is the source of
+  requirements, kept verbatim. Where this constitution or the implementation departs from it,
+  the departure MUST be recorded in an ADR and stated in the README. This constitution MUST NOT
+  restate requirements from the statement: the statement is input, not a rule, and a copy here
+  would drift from it.
 
 ## Development Workflow
 
@@ -178,6 +266,13 @@ dependency pointing inward absorbs them without rewrites.
   an agent may be made by hand; for those, the code and git history are the documentation.
 - Every plan MUST pass a Constitution Check against these principles before implementation, and
   any violation MUST be justified in the plan's complexity tracking or the plan changed.
+- Design documents (spec, plan, data-model, ADRs) specify contracts, rules and figures, not the
+  shape of the code: they say what a method returns and which rule it applies, never "one loop
+  accumulating four sums". An agent implements a plan literally, so a shape written there is a
+  shape nobody chose.
+- Every user story ends with a refactor task: with its tests green, the code it added is reviewed
+  against principle IX and cleaned before the story is marked done. This is the refactor step of
+  red-green-refactor, kept even where the tests were not written first.
 - CI (GitHub Actions) MUST be green before merging: full build, full suite including
   Testcontainers tests. JaCoCo coverage is reported, not gated.
 - Agent tooling under `.specify/` and `.claude/` is versioned configuration, so every developer
@@ -196,4 +291,4 @@ dependency pointing inward absorbs them without rewrites.
 - Compliance is checked at plan time (Constitution Check) and at review. Runtime guidance for
   developers lives in `README.md` and `docs/adr/`.
 
-**Version**: 1.1.2 | **Ratified**: 2026-11-15 | **Last Amended**: 2026-11-15
+**Version**: 2.1.0 | **Ratified**: 2026-11-15 | **Last Amended**: 2026-11-15

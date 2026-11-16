@@ -1,0 +1,51 @@
+### Cocos Trading API — example requests
+#
+# The statement's optional "collection for Postman, Insomnia or REST Client" (research R-023).
+# Runs as-is in IntelliJ's HTTP Client and in the VS Code REST Client extension.
+#
+# Prerequisites: docker compose up -d && ./mvnw spring-boot:run
+# Expected figures and the reasoning behind them:
+#   specs/001-portfolio-endpoint/quickstart.md
+# Response contract:
+#   specs/001-portfolio-endpoint/contracts/portfolio.openapi.yaml
+#
+# Only the portfolio endpoint exists so far; instrument search, order submission and
+# cancellation get their own sections as those features land.
+
+@host = http://localhost:8080
+@userId = 1
+
+### Portfolio — the seeded user
+# 200. settledCash 753000.00, availableCash 627500.00 (125500.00 reserved by two BUY LIMIT NEW
+# orders), totalAccountValue 889756.00. Positions, ticker ascending: BMA -10 / -15028.00 /
+# totalReturnPercent null, METR 500 / 114750.00 / -8.20, PAMP 40 / 37034.00 / -0.45.
+# No ARS position: pesos are cash, never a holding.
+# Side effect to check in the application log: exactly one ERROR naming BMA and -10 — the seeded
+# ledger really does hold a short position, and it is reported rather than hidden (ADR-0012).
+GET {{host}}/api/v1/users/{{userId}}/portfolio
+Accept: application/json
+
+### Portfolio — a user who has never traded
+# 200 with positions [], availableCash 0.00, settledCash 0.00, totalAccountValue 0.00.
+# Zeros, not nulls: those values are known (ADR-0013). Users 2, 3 and 4 have no orders in the seed.
+GET {{host}}/api/v1/users/2/portfolio
+Accept: application/json
+
+### Portfolio — an id that is not a user
+# 404 application/problem+json, title "Not Found", detail "User 999 does not exist".
+# Distinguishable from the request above: a wrong id is never served as a real account that has
+# never traded (FR-024).
+GET {{host}}/api/v1/users/999/portfolio
+Accept: application/json
+
+### Portfolio — a malformed id
+# 400 application/problem+json, title "Bad Request", detail
+# "Failed to convert 'userId' with value: 'abc'". The id is bound as a long, so this never
+# reaches the domain.
+GET {{host}}/api/v1/users/abc/portfolio
+Accept: application/json
+
+### Portfolio — two consecutive reads must agree
+# Same bytes as the first request, position order included, with no intervening order (SC-006).
+GET {{host}}/api/v1/users/{{userId}}/portfolio
+Accept: application/json

@@ -11,8 +11,10 @@ behind the solution, not only the solution. So here is the map.
 
 | Path | What it holds |
 |---|---|
+| [`docs/challenge/`](docs/challenge) | The statement this solution answers, kept verbatim so requirements can be cited instead of paraphrased |
 | [`docs/journal/`](docs/journal) | **The intent journal. Start here.** Every decision, in the order it was taken, with what was known at the time |
 | [`docs/adr/`](docs/adr) | Architecture Decision Records: one file per decision, with the alternatives that were discarded |
+| [`docs/api/trading-api.http`](docs/api/trading-api.http) | Example requests with their expected figures, runnable from IntelliJ's HTTP Client or VS Code's REST Client |
 | `src/main/java` | Application code |
 | `src/test/java` | Tests |
 | `src/main/resources/db/migration` | Flyway migrations: the schema as it was provided, plus every change made to it |
@@ -100,12 +102,16 @@ export COCOS_DB_PASSWORD="<password>"
 
 ## Attribution
 
-The statement and the schema and seed of the database are not mine: they were provided by Cocos
-Capital and published at https://github.com/cocos-capital/cocos-challenge. The Flyway migrations
-under `src/main/resources/db/migration` are a transcription of that `database.sql`.
+The statement, the schema and the seed data are not mine: they were provided by Cocos Capital and
+published at https://github.com/cocos-capital/cocos-challenge. `docs/challenge/backend-challenge.md`
+is a verbatim copy of that statement, taken from commit `abae7701`, and the Flyway migrations under
+`src/main/resources/db/migration` are a transcription of that `database.sql`.
 
 <!-- ───────────── DELETE BEFORE DELIVERY ─────────────
 Pending, so the README never claims something that is not true yet:
- - no endpoint is implemented; the paths above are a proposal to be confirmed
- - no migration yet for `order_status_history` or for the indexes
+ - the portfolio endpoint ships (feature 001-portfolio-endpoint); instrument search, order
+   submission and order cancellation are still a proposal to be confirmed
+ - `V2__portfolio_read_indexes.sql` adds the two `orders` indexes and the
+   `UNIQUE (instrumentid, date)` constraint on `marketdata`; there is still no migration for
+   `order_status_history`
 ──────────────────────────────────────────────────── -->

@@ -3,6 +3,15 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+    properties:
+      hibernate:
+        generate_statistics: true
   flyway:
     enabled: true
     locations: classpath:db/migration,classpath:db/seed
+  mvc:
+    problemdetails:
+      enabled: true
+  jackson:
+    write:
+      write-bigdecimal-as-plain: true
