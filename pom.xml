@@ -19,6 +19,10 @@
 		<jacoco-maven-plugin.version>0.8.16</jacoco-maven-plugin.version>
 		<archunit.version>1.5.1</archunit.version>
 		<spring-javaformat.version>0.0.48</spring-javaformat.version>
+		<sonar-maven-plugin.version>5.8.0.7211</sonar-maven-plugin.version>
+		<sonar.host.url>https://sonarcloud.io</sonar.host.url>
+		<sonar.organization>dominikowivan</sonar.organization>
+		<sonar.projectKey>Dominikowivan_cocos-trading-api-challenge</sonar.projectKey>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -92,6 +96,15 @@
 	</dependencies>
 
 	<build>
+		<pluginManagement>
+			<plugins>
+				<plugin>
+					<groupId>org.sonarsource.scanner.maven</groupId>
+					<artifactId>sonar-maven-plugin</artifactId>
+					<version>${sonar-maven-plugin.version}</version>
+				</plugin>
+			</plugins>
+		</pluginManagement>
 		<plugins>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
