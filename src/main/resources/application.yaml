@@ -23,6 +23,14 @@ spring:
   jackson:
     write:
       write-bigdecimal-as-plain: true
+  data:
+    web:
+      pageable:
+        default-page-size: ${SPRING_DATA_WEB_PAGEABLE_DEFAULT_PAGE_SIZE:20}
+        max-page-size: ${SPRING_DATA_WEB_PAGEABLE_MAX_PAGE_SIZE:100}
+trading:
+  search:
+    max-query-length: ${TRADING_SEARCH_MAX_QUERY_LENGTH:64}
 management:
   endpoints:
     web:

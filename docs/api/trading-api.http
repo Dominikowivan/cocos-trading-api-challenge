@@ -149,14 +149,19 @@ Accept: application/json
 GET {{host}}/api/v1/instruments/search?query=a&size=59
 Accept: application/json
 
-### Instrument search — a size above the configured maximum is rejected, not clamped
-# 400 application/problem+json, detail "The page size must be between 1 and 100" (FR-015a).
+### Instrument search — a size above the configured maximum is clamped
+# 200 with "size": 100, the maximum in force, echoed so the caller sees what they got (ADR-0032).
 GET {{host}}/api/v1/instruments/search?query=a&size=500
 Accept: application/json
 
-### Instrument search — a negative page is rejected
-# 400 application/problem+json, detail "The page number must not be negative".
+### Instrument search — a negative page is read as the first one
+# 200 with "page": 0 (ADR-0032).
 GET {{host}}/api/v1/instruments/search?query=a&page=-1
+Accept: application/json
+
+### Instrument search — a sort sent by the caller is ignored
+# 200, same order as without it: ticker, then id (ADR-0027, ADR-0032).
+GET {{host}}/api/v1/instruments/search?query=gr&sort=name,desc
 Accept: application/json
 
 ### Instrument search — an instrument with no price is still an instrument

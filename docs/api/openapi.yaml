@@ -142,8 +142,9 @@ paths:
         unchanged data always returns the same page in the same order, and consecutive pages
         together return every match exactly once (FR-013, FR-014, FR-015b, SC-007).
 
-        A bad paging request is **rejected, never silently adjusted** (FR-015a): a caller is never
-        served a page they did not ask for.
+        Paging follows Spring Data's defaults (ADR-0032, which replaces the rejection rule of
+        ADR-0028): an out-of-range `page` or `size` is **adjusted, not rejected**, and the response
+        echoes the `page` and `size` actually served. A `sort` parameter is ignored.
 
         Read-only. It reads `instruments` and `marketdata`, never the `orders` ledger, and takes
         no user id — there is no authentication, so every caller gets the same answer (FR-021,
@@ -172,7 +173,7 @@ paths:
           required: false
           description: |
             Zero-based page number (FR-015). A page past the last one is an empty page carrying
-            the real total, not an error (FR-015b). A negative page is rejected (FR-015a).
+            the real total, not an error (FR-015b). A negative page is read as page `0`.
           schema:
             type: integer
             format: int32
@@ -184,14 +185,14 @@ paths:
           required: false
           description: |
             How many results this page holds, so a client that wants more than the default can
-            ask for it in one request (FR-015a). Must be at least 1 and at most
-            `trading.search.max-page-size` — **100** unless the deployment configures otherwise.
-            A request above the maximum is **rejected, not clamped**.
+            ask for it in one request. A value above `spring.data.web.pageable.max-page-size` —
+            **100** unless the deployment configures otherwise — is **lowered to that maximum**;
+            a value below 1 falls back to the default.
 
-            When absent, the deployment's `trading.search.default-page-size` applies — **20**
-            unless configured otherwise (FR-015c). Both limits are settable per deployment
-            through environment variables, so neither is stated here as a fixed `maximum`: the
-            value in force is always the one echoed in the response or named in the rejection.
+            When absent, `spring.data.web.pageable.default-page-size` applies — **20** unless
+            configured otherwise (FR-015c). Both limits are settable per deployment through
+            environment variables, so neither is stated here as a fixed `maximum`: the value in
+            force is always the one echoed in the response.
           schema:
             type: integer
             format: int32
@@ -350,7 +351,7 @@ paths:
         "400":
           description: |
             The request cannot be served: the query is missing, empty, whitespace-only (FR-008) or
-            over the maximum length (FR-009); or the paging is out of bounds (FR-015a).
+            over the maximum length (FR-009). Paging is never a reason for a 400 (ADR-0032).
             Distinguishable from the empty page above: there, the search ran; here, it never ran
             (SC-010).
           content:
@@ -379,21 +380,6 @@ paths:
                     title: Bad Request
                     status: 400
                     detail: The search query must be at most 64 characters
-                    instance: /api/v1/instruments/search
-                sizeTooLarge:
-                  summary: A page size above the configured maximum
-                  description: Rejected, never clamped — the caller is told, not quietly served something else (FR-015a).
-                  value:
-                    title: Bad Request
-                    status: 400
-                    detail: The page size must be between 1 and 100
-                    instance: /api/v1/instruments/search
-                negativePage:
-                  summary: A negative page number
-                  value:
-                    title: Bad Request
-                    status: 400
-                    detail: The page number must not be negative
                     instance: /api/v1/instruments/search
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
@@ -526,8 +512,9 @@ components:
           format: int32
           minimum: 1
           description: |
-            The page size in force: what the caller asked for, or the deployment's configured
-            default when they asked for nothing. Echoing it is how the configured default stays
+            The page size in force: what the caller asked for, lowered to the configured maximum
+            if it was above it, or the deployment's configured default when they asked for nothing
+            (ADR-0032). Echoing it is how the configured default stays
             observable without a settings endpoint (FR-015c).
           example: 20
         totalElements:

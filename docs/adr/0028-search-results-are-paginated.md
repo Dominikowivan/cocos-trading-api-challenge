@@ -1,7 +1,13 @@
 # ADR-0028: Search results are paginated, with a total count
 
-- **Status:** Accepted
+- **Status:** Accepted; partly superseded by [ADR-0032](0032-paging-is-spring-datas-pageable.md)
 - **Date:** 2026-11-16
+
+> **Superseded in part (2026-11-16).** The response envelope, the total count and the shared
+> snapshot below still hold. Two sections do not: *"The limits are configuration, not constants"*
+> (the page limits are now Spring Data's `spring.data.web.pageable.*`, global, and only
+> `max-query-length` remains search's own) and *"A bad paging request is rejected, never
+> clamped"* (out-of-range paging is now adjusted, not rejected). See ADR-0032.
 
 ## Context
 

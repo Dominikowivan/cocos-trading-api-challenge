@@ -1,5 +1,7 @@
 package com.cocos.trading.service.search;
 
-public record SearchRequest(String query, int page, Integer size) {
+import org.springframework.data.domain.Pageable;
+
+public record SearchRequest(String query, Pageable pageable) {
 
 }

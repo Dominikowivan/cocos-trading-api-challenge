@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test;
 
 class SearchQueryTest {
 
-	private static final SearchLimits LIMITS = new SearchLimits(64, 20, 100);
+	private static final SearchLimits LIMITS = new SearchLimits(64);
 
 	@Test
 	void surrounding_whitespace_is_trimmed() {
@@ -57,7 +57,7 @@ class SearchQueryTest {
 
 	@Test
 	void the_maximum_is_the_configured_one_not_a_constant() {
-		SearchLimits shorter = new SearchLimits(10, 20, 100);
+		SearchLimits shorter = new SearchLimits(10);
 		String tooLong = "x".repeat(11);
 
 		assertThatThrownBy(() -> SearchQuery.of(tooLong, shorter)).isInstanceOf(InvalidSearchRequestException.class)
