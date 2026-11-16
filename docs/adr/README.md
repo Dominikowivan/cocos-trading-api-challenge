@@ -29,4 +29,5 @@ currently holds; the journal is the authority on how it was reached.**
 | [0017](0017-layers-with-a-service-that-orchestrates.md) | Layers, with a service that orchestrates and a pure model | Accepted |
 | [0018](0018-architecture-rules-as-archunit-tests.md) | The layering rules are enforced by ArchUnit tests | Accepted |
 | [0019](0019-spring-java-format-checked-in-the-build.md) | Spring Java Format, checked in the build | Accepted |
-| [0020](0020-static-analysis-on-sonarqube-cloud.md) | Static analysis on SonarQube Cloud, gating develop | Accepted |
+| [0020](0020-static-analysis-on-sonarqube-cloud.md) | Static analysis on SonarQube Cloud, gating develop | Accepted; partly superseded by [0021](0021-the-quality-gate-blocks-pull-requests.md) |
+| [0021](0021-the-quality-gate-blocks-pull-requests.md) | The quality gate blocks pull requests, not pushes to develop | Accepted |

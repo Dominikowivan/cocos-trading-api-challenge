@@ -1,6 +1,6 @@
 # ADR-0020: Static analysis on SonarQube Cloud, gating develop
 
-- **Status:** Accepted
+- **Status:** Accepted; when the quality gate blocks, superseded by [ADR-0021](0021-the-quality-gate-blocks-pull-requests.md)
 - **Date:** 2026-11-16
 
 ## Context

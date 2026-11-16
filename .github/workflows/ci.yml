@@ -36,7 +36,7 @@ jobs:
         if: github.ref == 'refs/heads/develop' || github.base_ref == 'develop'
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: ./mvnw -B sonar:sonar -Dsonar.qualitygate.wait=true
+        run: ./mvnw -B sonar:sonar -Dsonar.qualitygate.wait=${{ github.event_name == 'pull_request' }}
 
       - name: Upload coverage report
         if: always()
