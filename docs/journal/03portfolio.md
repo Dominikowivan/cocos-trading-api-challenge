@@ -17,6 +17,40 @@ Según los requerimientos funcionales, siempre se usan las órdenes en estado "F
 
 Agrego el challenge.md a documentos porque es la fuente de verdad de los requerimientos del proyecto y va a servir a la hora de trabajar con SDD.
 
+
+Para conocer cuál es el valor de una cuenta se necesita saber:
+
+# Pesos que tenés
+
+- Settled cash (plata que tiene): todas las FILLED. Size x precio, con el signo del lado (SELL y CASH_IN suman) (BUY y CASH_OUT restan). Es la plata que ya se movió.
+- Reserved cash (plata que tiene reservada en órdenes BUY LIMIT en NEW): lo mismo, size x precio.
+
+# Acciones que tenés
+
+- Holdings: ACCIONES FILLED. Se agrupan por instrumento, así cada uno tiene su data:
+  - cantidad
+  - promedio
+  - filtra posiciones con cantidad 0. Es importante recorrer la historia porque si compraste y vendiste la misma cantidad, el promedio cambia: arrancás de 0.
+    el promedio se reinicia al precio de la orden que cruzó y arranca del otro lado. De todas formas al calcular ganancia, no estamos calculando posiciones en short porque ahora mismo las tomamos como una anomalía.
+Pero si necesitáramos soportarlas, ya está listo el promedio del holding.
+ 
+- Reserved shares: las órdenes que se prometieron vender. SELL LIMIT en NEW.
+
+De acá podemos derivar entonces:
+- Dinero disponible = settledCash − reservedCash
+- Cuántas acciones disponibles tenemos = holdings − reservedShares.
+
+
+Finalmente: valor total de la cuenta del usuario. Se cuenta con el settledCash y el valor de las acciones que tiene en el mercado en ese momento (mirando el close).
+
+Para repasar:
+Holdings es lo que tenés y lo que te costó. De acá vamos a calcular el promedio de cuánto te costó, que se usa después para armar el rendimiento total.
+
+Lo importante acá es que el promedio solo cambia cuando aumentás la exposición. Vender algo que ya tenías no te cambia el promedio, porque eso ya es ganancia realizada. El promedio se saca sobre cuánto promedia todo lo que pagaste.
+Si cerraste una posición, se resetea el promedio.
+
+Position es lo que representa hoy en el mercado el instrumento (mirando el close de marketdata)
+
 Arranco con el specify.
 
 ## Clarificaciones

@@ -775,7 +775,7 @@ read the expected figures there and fire the requests from here.
 ### R-024: The ledger query fetches only the statuses the fold uses
 
 > **Amended (ADR-0017):** the set still comes from the model (`OrderStatus.contributing()`), but it
-> is the service that passes it to `OrderRepository.findLedgerOf`, through `OrderMapper.toStatusColumns`.
+> is the service that passes it to `OrderRepository.findOrdersOf`, through `OrderMapper.toStatusColumns`.
 > The fold no longer asks for anything: it folds what it is given. Persistence still binds a
 > parameter and decides nothing.
 
