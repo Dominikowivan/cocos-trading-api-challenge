@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-11-15
-- **Journal:** [03portfolio](../journal/03portfolio.md), *Primera clarificacion*
+- **Journal:** [03portfolio](../journal/03Portfolio.md), *Primera clarificacion*
 
 ## Context
 

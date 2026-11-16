@@ -18,10 +18,8 @@ class PortfolioTotalValueTest {
 
 	@Test
 	void the_total_is_settled_cash_plus_every_position_value() {
-		Portfolio portfolio = new Portfolio(money("753000.00"), money("627500.00"), List.of(
-				position(PAMP, 40, "37034.00"),
-				position(METR, 500, "114750.00"),
-				position(BMA, -10, "-15028.00")));
+		Portfolio portfolio = new Portfolio(money("753000.00"), money("627500.00"), List
+			.of(position(PAMP, 40, "37034.00"), position(METR, 500, "114750.00"), position(BMA, -10, "-15028.00")));
 
 		assertThat(portfolio.totalAccountValue().orElseThrow()).isEqualByComparingTo("889756.00");
 	}
@@ -38,10 +36,8 @@ class PortfolioTotalValueTest {
 
 	@Test
 	void the_total_counts_reserved_pesos_because_they_are_still_the_users_money() {
-		Portfolio portfolio = new Portfolio(money("753000.00"), money("627500.00"), List.of(
-				position(PAMP, 40, "37034.00"),
-				position(METR, 500, "114750.00"),
-				position(BMA, -10, "-15028.00")));
+		Portfolio portfolio = new Portfolio(money("753000.00"), money("627500.00"), List
+			.of(position(PAMP, 40, "37034.00"), position(METR, 500, "114750.00"), position(BMA, -10, "-15028.00")));
 
 		BigDecimal onAvailableCash = portfolio.availableCash().add(new BigDecimal("136756.00"));
 
@@ -59,9 +55,8 @@ class PortfolioTotalValueTest {
 
 	@Test
 	void one_unpriced_position_suppresses_the_total_rather_than_yielding_a_partial_sum() {
-		Portfolio portfolio = new Portfolio(money("477500.00"), money("477500.00"), List.of(
-				position(PAMP, 40, "37034.00"),
-				unpriced(PGR, 25)));
+		Portfolio portfolio = new Portfolio(money("477500.00"), money("477500.00"),
+				List.of(position(PAMP, 40, "37034.00"), unpriced(PGR, 25)));
 
 		assertThat(portfolio.totalAccountValue()).isEmpty();
 	}

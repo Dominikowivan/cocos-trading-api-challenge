@@ -35,10 +35,8 @@ class CashExclusionOrderingTest {
 		Map<Long, BigDecimal> closes = Map.of(PAMP.instrumentId(), new BigDecimal("925.85"), METR.instrumentId(),
 				new BigDecimal("229.50"));
 
-		AccountLedger ledger = new AccountLedger(Ledgers.orders(
-				cashIn(1000000, "2023-07-12T12:11:20"),
-				filledBuy(PAMP, 50, "930", "2023-07-12T12:31:20"),
-				filledBuy(METR, 500, "250", "2023-07-13T14:11:20"),
+		AccountLedger ledger = new AccountLedger(Ledgers.orders(cashIn(1000000, "2023-07-12T12:11:20"),
+				filledBuy(PAMP, 50, "930", "2023-07-12T12:31:20"), filledBuy(METR, 500, "250", "2023-07-13T14:11:20"),
 				cashOut(100000, "2023-07-13T12:31:20")));
 
 		return Portfolio.valued(ledger.snapshot(), new Closes(closes));

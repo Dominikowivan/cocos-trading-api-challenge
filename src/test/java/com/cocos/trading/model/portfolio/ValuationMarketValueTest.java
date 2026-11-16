@@ -21,8 +21,7 @@ class ValuationMarketValueTest {
 	@Test
 	void market_value_is_quantity_times_the_latest_close_at_scale_two() {
 		Portfolio portfolio = valued(Map.of(PAMP.instrumentId(), new BigDecimal("925.85")),
-				filledBuy(PAMP, 50, "930", "2023-07-12T12:31:20"),
-				filledSell(PAMP, 10, "940", "2023-07-12T14:51:20"));
+				filledBuy(PAMP, 50, "930", "2023-07-12T12:31:20"), filledSell(PAMP, 10, "940", "2023-07-12T14:51:20"));
 
 		BigDecimal marketValue = portfolio.positions().getFirst().marketValue().orElseThrow();
 		assertThat(marketValue).isEqualByComparingTo("37034.00");
@@ -32,8 +31,7 @@ class ValuationMarketValueTest {
 	@Test
 	void a_negative_quantity_yields_a_negative_market_value() {
 		Portfolio portfolio = valued(Map.of(BMA.instrumentId(), new BigDecimal("1502.80")),
-				filledBuy(BMA, 20, "1540", "2023-07-13T12:51:20"),
-				filledSell(BMA, 30, "1530", "2023-07-13T15:13:20"));
+				filledBuy(BMA, 20, "1540", "2023-07-13T12:51:20"), filledSell(BMA, 30, "1530", "2023-07-13T15:13:20"));
 
 		assertThat(portfolio.positions().getFirst().marketValue().orElseThrow()).isEqualByComparingTo("-15028.00");
 	}

@@ -22,20 +22,20 @@ class AccountLedgerQuantityTest {
 
 	@Test
 	void buys_add_and_sells_subtract_over_settled_orders() {
-		AccountSnapshot snapshot = new AccountLedger(Ledgers.orders(
-				filledBuy(PAMP, 50, "930", "2023-07-12T12:31:20"),
-				filledSell(PAMP, 10, "940", "2023-07-12T14:51:20"))).snapshot();
+		AccountSnapshot snapshot = new AccountLedger(Ledgers.orders(filledBuy(PAMP, 50, "930", "2023-07-12T12:31:20"),
+				filledSell(PAMP, 10, "940", "2023-07-12T14:51:20")))
+			.snapshot();
 
 		assertThat(quantityOf(snapshot, PAMP)).isEqualByComparingTo("40");
 	}
 
 	@Test
 	void open_cancelled_and_rejected_orders_change_no_quantity() {
-		AccountSnapshot snapshot = new AccountLedger(Ledgers.orders(
-				filledBuy(PAMP, 50, "930", "2023-07-12T12:31:20"),
+		AccountSnapshot snapshot = new AccountLedger(Ledgers.orders(filledBuy(PAMP, 50, "930", "2023-07-12T12:31:20"),
 				openBuyLimit(PAMP, 50, "920", "2023-07-12T14:21:20"),
 				cancelledBuyLimit(PAMP, 50, "920", "2023-07-12T14:31:20"),
-				rejectedSell(PAMP, 100, "950", "2023-07-12T16:11:20"))).snapshot();
+				rejectedSell(PAMP, 100, "950", "2023-07-12T16:11:20")))
+			.snapshot();
 
 		assertThat(quantityOf(snapshot, PAMP)).isEqualByComparingTo("50");
 	}
@@ -47,27 +47,27 @@ class AccountLedgerQuantityTest {
 
 	@Test
 	void a_cash_instrument_is_never_a_holding() {
-		AccountSnapshot snapshot = new AccountLedger(Ledgers.orders(
-				cashIn(1000000, "2023-07-12T12:11:20"),
-				cashOut(100000, "2023-07-13T12:31:20"))).snapshot();
+		AccountSnapshot snapshot = new AccountLedger(
+				Ledgers.orders(cashIn(1000000, "2023-07-12T12:11:20"), cashOut(100000, "2023-07-13T12:31:20")))
+			.snapshot();
 
 		assertThat(snapshot.holdings()).isEmpty();
 	}
 
 	@Test
 	void a_net_zero_instrument_is_not_listed() {
-		AccountSnapshot snapshot = new AccountLedger(Ledgers.orders(
-				filledBuy(BMA, 20, "1540", "2023-07-13T12:51:20"),
-				filledSell(BMA, 20, "1530", "2023-07-13T15:13:20"))).snapshot();
+		AccountSnapshot snapshot = new AccountLedger(Ledgers.orders(filledBuy(BMA, 20, "1540", "2023-07-13T12:51:20"),
+				filledSell(BMA, 20, "1530", "2023-07-13T15:13:20")))
+			.snapshot();
 
 		assertThat(snapshot.holdings()).isEmpty();
 	}
 
 	@Test
 	void a_short_position_is_folded_as_a_negative_quantity() {
-		AccountSnapshot snapshot = new AccountLedger(Ledgers.orders(
-				filledBuy(BMA, 20, "1540", "2023-07-13T12:51:20"),
-				filledSell(BMA, 30, "1530", "2023-07-13T15:13:20"))).snapshot();
+		AccountSnapshot snapshot = new AccountLedger(Ledgers.orders(filledBuy(BMA, 20, "1540", "2023-07-13T12:51:20"),
+				filledSell(BMA, 30, "1530", "2023-07-13T15:13:20")))
+			.snapshot();
 
 		assertThat(quantityOf(snapshot, BMA)).isEqualByComparingTo("-10");
 	}

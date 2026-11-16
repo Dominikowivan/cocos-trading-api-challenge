@@ -4,8 +4,8 @@ import java.math.BigDecimal;
 
 import com.cocos.trading.model.portfolio.Position;
 
-public record PositionResponse(long instrumentId, String ticker, String name, BigDecimal quantity, BigDecimal marketValue,
-		BigDecimal totalReturnPercent) {
+public record PositionResponse(long instrumentId, String ticker, String name, BigDecimal quantity,
+		BigDecimal marketValue, BigDecimal totalReturnPercent) {
 
 	public static PositionResponse of(Position position) {
 		return new PositionResponse(position.instrument().instrumentId(), position.instrument().ticker(),

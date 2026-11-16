@@ -70,8 +70,8 @@ public final class Ledgers {
 		return order(instrument, OrderSide.SELL, OrderStatus.REJECTED, OrderKind.MARKET, size, price, at);
 	}
 
-	public static Order order(InstrumentRef instrument, OrderSide side, OrderStatus status, OrderKind kind,
-			long size, String price, String at) {
+	public static Order order(InstrumentRef instrument, OrderSide side, OrderStatus status, OrderKind kind, long size,
+			String price, String at) {
 		return new Order(IDS.incrementAndGet(), instrument, side, status, kind, BigDecimal.valueOf(size),
 				new BigDecimal(price), LocalDateTime.parse(at));
 	}

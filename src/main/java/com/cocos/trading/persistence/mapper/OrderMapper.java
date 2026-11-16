@@ -26,10 +26,9 @@ public final class OrderMapper {
 	}
 
 	private static Order toOrder(OrderEntity order) {
-		return new Order(order.getId(), toInstrumentRef(order.getInstrument()),
-				OrderSide.valueOf(order.getSide()), OrderStatus.valueOf(order.getStatus()),
-				OrderKind.valueOf(order.getType()), BigDecimal.valueOf(order.getSize()), order.getPrice(),
-				order.getDatetime());
+		return new Order(order.getId(), toInstrumentRef(order.getInstrument()), OrderSide.valueOf(order.getSide()),
+				OrderStatus.valueOf(order.getStatus()), OrderKind.valueOf(order.getType()),
+				BigDecimal.valueOf(order.getSize()), order.getPrice(), order.getDatetime());
 	}
 
 	private static InstrumentRef toInstrumentRef(InstrumentEntity instrument) {

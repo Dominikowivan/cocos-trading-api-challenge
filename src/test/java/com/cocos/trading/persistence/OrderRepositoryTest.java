@@ -41,8 +41,7 @@ class OrderRepositoryTest extends PersistenceTestBase {
 	void rows_come_back_in_datetime_then_id_order() {
 		List<Order> orders = ordersOf(SEEDED);
 
-		assertThat(orders).isSortedAccordingTo(
-				Comparator.comparing(Order::occurredAt).thenComparing(Order::orderId));
+		assertThat(orders).isSortedAccordingTo(Comparator.comparing(Order::occurredAt).thenComparing(Order::orderId));
 	}
 
 	@Test
@@ -69,8 +68,8 @@ class OrderRepositoryTest extends PersistenceTestBase {
 	}
 
 	private List<Order> ordersOf(Integer userId) {
-		return OrderMapper.toOrders(
-				orderRepository.findOrdersOf(userId, OrderMapper.toStatusColumns(OrderStatus.contributing())));
+		return OrderMapper
+			.toOrders(orderRepository.findOrdersOf(userId, OrderMapper.toStatusColumns(OrderStatus.contributing())));
 	}
 
 }
