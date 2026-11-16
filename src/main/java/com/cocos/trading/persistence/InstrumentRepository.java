@@ -1,7 +1,6 @@
 package com.cocos.trading.persistence;
 
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -12,8 +11,8 @@ import com.cocos.trading.persistence.entity.InstrumentEntity;
 
 public interface InstrumentRepository extends JpaRepository<InstrumentEntity, Integer> {
 
-	default Page<InstrumentEntity> searchNonCash(String text, int page, int size) {
-		return search(text, InstrumentRef.CASH, PageRequest.of(page, size));
+	default Page<InstrumentEntity> searchNonCash(String text, Pageable pageable) {
+		return search(text, InstrumentRef.CASH, pageable);
 	}
 
 	@Query("""
