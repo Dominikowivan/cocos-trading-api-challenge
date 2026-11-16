@@ -115,6 +115,15 @@ limit it enforced.
 TRADING_SEARCH_DEFAULT_PAGE_SIZE=5 docker compose --profile app up -d --build
 ```
 
+The database access has a deadline and a bounded pool (ADR-0031). When either runs out the API
+answers `503` with a problem detail, instead of holding the request open:
+
+| Property | Default | Environment variable | What it does |
+|---|---|---|---|
+| `spring.transaction.default-timeout` | `10s` | `SPRING_TRANSACTION_DEFAULT_TIMEOUT` | The longest a request's transaction may run. Past it, the running query is cancelled |
+| `spring.datasource.hikari.maximum-pool-size` | `10` | `SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE` | Connections per instance. Times the number of instances, it must stay below the database's `max_connections` |
+| `spring.datasource.hikari.connection-timeout` | `5000` (ms) | `SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT` | The longest a request waits for a free connection. A plain number of milliseconds: Hikari does not read `5s` |
+
 ## Tests
 
 ```bash

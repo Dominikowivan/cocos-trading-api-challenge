@@ -122,6 +122,8 @@ paths:
                 status: 404
                 detail: User 999 does not exist
                 instance: /api/v1/users/999/portfolio
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
 
   /api/v1/instruments/search:
     get:
@@ -393,8 +395,25 @@ paths:
                     status: 400
                     detail: The page number must not be negative
                     instance: /api/v1/instruments/search
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
 
 components:
+  responses:
+    ServiceUnavailable:
+      description: |
+        The database did not answer in time: the request's transaction ran past its timeout, or no
+        connection came free in the pool within the connection timeout. Both are configurable
+        (ADR-0031). Nothing was changed; the same request can be retried.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+          example:
+            title: Service Unavailable
+            status: 503
+            detail: The service is temporarily unavailable, try again later
+            instance: /api/v1/instruments/search
   schemas:
     Portfolio:
       type: object

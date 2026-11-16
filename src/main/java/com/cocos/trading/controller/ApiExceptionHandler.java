@@ -1,9 +1,14 @@
 package com.cocos.trading.controller;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.transaction.CannotCreateTransactionException;
+import org.springframework.transaction.TransactionTimedOutException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -15,6 +20,8 @@ import com.cocos.trading.service.portfolio.UnknownUserException;
 @RestControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE)
 class ApiExceptionHandler {
+
+	private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
 	@ExceptionHandler(UnknownUserException.class)
 	ProblemDetail unknownUser(UnknownUserException exception) {
@@ -36,6 +43,13 @@ class ApiExceptionHandler {
 	ProblemDetail malformedIdentifier(MethodArgumentTypeMismatchException exception) {
 		return problem(HttpStatus.BAD_REQUEST,
 				"Failed to convert '" + exception.getName() + "' with value: '" + exception.getValue() + "'");
+	}
+
+	@ExceptionHandler({ QueryTimeoutException.class, TransactionTimedOutException.class,
+			CannotCreateTransactionException.class })
+	ProblemDetail databaseUnavailable(Exception exception) {
+		log.warn("database did not answer in time: {}", exception.getMessage());
+		return problem(HttpStatus.SERVICE_UNAVAILABLE, "The service is temporarily unavailable, try again later");
 	}
 
 	private static ProblemDetail problem(HttpStatus status, String detail) {
