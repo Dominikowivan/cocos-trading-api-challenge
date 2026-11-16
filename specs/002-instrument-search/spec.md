@@ -36,7 +36,7 @@ Unlike the portfolio, this feature does not read the `orders` ledger at all: it 
 
 ### Measurements this spec is built on
 
-All figures below were measured on `src/main/resources/db/seed/V1000__given_dataset.sql`
+All figures below were measured on `src/main/resources/db/seed/R__given_dataset.sql`
 (2026-11-16), not estimated:
 
 - 66 instruments: 65 of type `ACCIONES` and exactly one of type `MONEDA` — `ARS` / `PESOS`, id 66.
@@ -48,10 +48,9 @@ All figures below were measured on `src/main/resources/db/seed/V1000__given_data
   unpriced instruments this feature can return are `PGR` and `IRCP` — both reachable from the
   provided seed, so FR-018 needs no constructed fixture.
 - Probes over the 65 searchable instruments, matching ticker or name. Case-insensitive substring:
-  `banco` → 4, `pam` → 1, `metr` → 1, `molinos` → 3, `gr` → 9, `rio` → 3, `compania` → 0,
-  `zorraquin` → 0, `a` → 59 of the 65, `ars` → 0, `pesos` → 0, `%` → 0. Adding accent folding
-  changes exactly three of those: `rio` → 4 (adds `MOLI`), `compania` → 1 (`INTR`) and
-  `zorraquin` → 1 (`GARO`).
+  `banco` → 4, `pam` → 1, `metr` → 1, `molinos` → 3, `gr` → 9, `rio` → 3, `río` → 1 (`MOLI`),
+  `compania` → 0, `compañía` → 1, `zorraquin` → 0, `a` → 59 of the 65, `ars` → 0, `pesos` → 0,
+  `%` → 0.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -94,16 +93,14 @@ result.
 ### User Story 2 - Find an instrument by name (Priority: P2)
 
 A user who does not remember the ticker types part of the company's name — `banco`, `molinos`,
-`rio` — and gets the instruments whose name contains what they typed, regardless of case and
-regardless of accents. Searching `rio` finds `Molinos Río de la Plata`, and searching `compania`
-finds `Compañía Introductora de Buenos Aires S.A.`.
+`río` — and gets the instruments whose name contains what they typed, regardless of case.
+Accents count: `río` finds `Molinos Río de la Plata` and `rio` does not (FR-005).
 
 **Why this priority**: it is the second half of the statement's "por ticker y/o por nombre", and it
 is what makes the endpoint useful to someone who knows the company but not its symbol. It depends
-on nothing in P1 beyond the shape of a result, and accent-insensitivity is what separates a search
-that works on this dataset from one that silently hides three instruments.
+on nothing in P1 beyond the shape of a result.
 
-**Independent Test**: search for `banco`, `rio` and `compania` against the provided dataset and
+**Independent Test**: search for `banco`, `río` and `compañía` against the provided dataset and
 compare the returned sets against the names measured above.
 
 **Acceptance Scenarios**:
@@ -113,33 +110,26 @@ compare the returned sets against the names measured above.
    "activos similares" means here: one fragment returns the family that shares it.
 2. **Given** the same dataset, **When** a user searches `BANCO` in upper case, **Then** the result
    is identical to the one for `banco`.
-3. **Given** the same dataset, **When** a user searches `rio` without an accent, **Then** the
-   result contains `MOLI` (`Molinos Río de la Plata`) alongside the three unaccented matches
-   `BHIP`, `RICH` and `OEST` — four in total. A plain substring match returns only three, which is
-   the failure this scenario exists to catch.
-4. **Given** the same dataset, **When** a user searches `compania`, **Then** `INTR`
-   (`Compañía Introductora de Buenos Aires S.A.`) is returned. A plain substring match returns
-   nothing.
+3. **Given** the same dataset, **When** a user searches `río` with its accent, **Then** `MOLI`
+   (`Molinos Río de la Plata`) is returned; searching `rio` returns `BHIP`, `OEST` and `RICH`
+   and not `MOLI`.
+4. **Given** the same dataset, **When** a user searches `compañía`, **Then** `INTR`
+   (`Compañía Introductora de Buenos Aires S.A.`) is returned; `compania` returns nothing.
 5. **Given** the same dataset, **When** a user searches `metr`, **Then** `METR` (`MetroGAS S.A.`)
    is returned once, even though the query matches both its ticker and its name — a match on both
    fields is still one result.
 
 ---
 
-### User Story 3 - Best matches first, one page at a time (Priority: P3)
+### User Story 3 - One page at a time, in ticker order (Priority: P3)
 
-A user whose query is broad — `a` matches 59 of the 65 searchable instruments — gets a short,
-ordered page rather than the whole market: the closest matches first, a bounded number of them,
-and a statement of how many matched in total so they can ask for the next page or refine the
-query. Within the same relevance tier results are ordered by ticker, so the same query always
-returns the same page in the same order.
+A user whose query is broad — `a` matches 59 of the 65 searchable instruments — gets a short, ordered page
+rather than the whole market: a bounded number of results in ticker order, and a statement of how
+many matched in total so they can ask for the next page or refine the query. The order is ticker,
+then id, so the same query always returns the same page in the same order.
 
-Relevance, strongest first: an exact ticker match, then a ticker that starts with the query, then a
-name that starts with the query, then any other match on ticker or name.
-
-**Why this priority**: it is what turns a filter into a search. Without it the answer to a
-two-letter query is unusable and the response size is unbounded; without the tie-breaker the
-same query can return different pages on different runs, which no test can pin down.
+**Why this priority**: without it the response size is unbounded; without a total order the same
+query can return different pages on different runs, which no test can pin down.
 
 **Independent Test**: search for `a` and check the page is bounded and ordered as specified, and
 that the response states 59 matched; ask for the second page and check it continues where the
@@ -149,23 +139,21 @@ first stopped; search twice and check the two responses are identical.
 
 1. **Given** the provided dataset, **When** a user searches `a`, **Then** the number of results
    returned does not exceed the page size, even though 59 instruments match.
-2. **Given** the same dataset, **When** a user searches `gr`, **Then** `GRIM` — whose ticker starts
-   with `gr` — is ordered above `MOLA`, which matches only through its name (`Molinos Agro S.A.`).
-3. **Given** the same dataset, **When** a user searches `bma`, **Then** `BMA` is the first result,
-   because an exact ticker match outranks every partial one.
-4. **Given** the same dataset, **When** the same query is sent twice with no data change,
+2. **Given** the same dataset, **When** a user searches `gr`, **Then** the nine matches come in
+   ticker order: `AGRO`, `GCLA`, `GGAL`, `GRIM`, `LOMA`, `MOLA`, `OEST`, `PGR`, `SUPV`.
+3. **Given** the same dataset, **When** the same query is sent twice with no data change,
    **Then** the two responses are byte-for-byte identical.
-5. **Given** a query that matches more instruments than one page holds, **When** the response is
+4. **Given** a query that matches more instruments than one page holds, **When** the response is
    read, **Then** it states how many matched in total and which page this is, so the user knows
    to ask for the next page or refine the query rather than believing they have seen the whole
    market.
-6. **Given** the same dataset and a query of `a`, **When** the user asks for the second page,
+5. **Given** the same dataset and a query of `a`, **When** the user asks for the second page,
    **Then** it continues exactly where the first stopped, with no instrument repeated and none
    skipped — which only holds because the order is total.
-7. **Given** a request asking for a page beyond the last one, **When** the response is read,
+6. **Given** a request asking for a page beyond the last one, **When** the response is read,
    **Then** it is an empty page with the same total, not an error: the search ran and that page
    holds nothing.
-8. **Given** a request asking for a page size above the stated maximum, or for a negative page,
+7. **Given** a request asking for a page size above the stated maximum, or for a negative page,
    **When** it is received, **Then** it is rejected as a bad request rather than silently
    adjusted, so the caller is never served a page different from the one they asked for.
 
@@ -221,21 +209,22 @@ are absent.
   a blank query.
 - **Surrounding whitespace.** `"  pamp  "` is treated as `pamp`. Leading and trailing whitespace is
   not part of what the user meant to type.
-- **Accented names.** Three instruments in the dataset carry diacritics. Both the query and the
-  stored name are folded before matching, so `rio` finds `Río`, `compania` finds `Compañía`, and
-  `Zorraquín` is found by `zorraquin`. The reverse also holds: typing `río` finds it too.
+- **Accented names.** Three instruments in the dataset carry diacritics. Accents are not folded:
+  `río` finds `Río` and `rio` does not, likewise `compañía` and `zorraquín`. Their tickers (`MOLI`,
+  `INTR`, `GARO`) and any unaccented fragment of their names always find them. Upper and lower case
+  still match across accents: `RÍO` finds `Río`.
 - **Characters that mean something to the search engine.** A query containing `%`, `_`, a quote or
   a backslash is matched as literal text. `%` returns the instruments whose ticker or name contains
   a per-cent sign — none in this dataset — not the whole market.
 - **Very long query.** A query longer than any ticker or name cannot match anything; it is answered
   with an empty list, and a query beyond a sane maximum length is rejected as a bad request rather
   than passed to the database.
-- **The pesos instrument.** `ARS` / `PESOS` (id 66) is cash, not a tradable asset: the portfolio
-  excludes it from positions and an order against it is a transfer, not a trade. It is excluded
-  from the search for the same reason (FR-023), so searching `ars` or `pesos` returns an empty
-  list — the same answer as any other query that matches nothing, with no special explanation.
-  The rule is written against the `MONEDA` **type**, not against the id or the ticker, so a second
-  currency added later is excluded without changing anything.
+- **The pesos instrument.** `ARS` / `PESOS` (id 66) is cash, not a tradable asset: it is the
+  currency every asset is paid in, it has no market data because it cannot be priced against
+  itself, and it moves through transfers rather than trades. The portfolio excludes it from
+  positions, and the search excludes it for the same reason (FR-023), so searching `ars` or `pesos`
+  returns an empty list. The rule is written against the `MONEDA` **type**, not against the id or
+  the ticker, so a second currency added later is excluded without changing anything.
 - **A query that is close but not contained.** `bnaco` matches no ticker and no name, so it returns
   an empty list (FR-024). Searching is literal: the user refines what they typed, and the API does
   not guess what they meant.
@@ -257,9 +246,8 @@ are absent.
 - **FR-003**: Matching MUST be partial: an instrument matches when its ticker or its name contains
   the query, not only when it equals it.
 - **FR-004**: Matching MUST be case-insensitive in both directions, for ticker and for name.
-- **FR-005**: Matching MUST be accent-insensitive: query and stored text are folded so that `rio`
-  matches `Río`, `compania` matches `Compañía` and `zorraquin` matches `Zorraquín`, and the
-  accented spellings match the unaccented stored text too.
+- **FR-005**: Matching is accent-sensitive: `río` matches `Río` and `rio` does not. Accent folding
+  was considered and deferred ([ADR-0027](../../docs/adr/0027-instrument-search-is-one-short-jpql-query.md)).
 - **FR-006**: An instrument matching on both its ticker and its name MUST be returned exactly once.
 - **FR-007**: The query MUST be trimmed of leading and trailing whitespace before matching.
 - **FR-008**: A missing, empty or whitespace-only query MUST be rejected as a bad request, and MUST
@@ -271,10 +259,9 @@ are absent.
   distinguishable from the rejection of a blank query and from a not-found error.
 - **FR-012**: Each result MUST carry the instrument's id, ticker, name and type. The id is what the
   order endpoint consumes.
-- **FR-013**: Results MUST be ordered by relevance, strongest first: exact ticker match, then
-  ticker starting with the query, then name starting with the query, then any other match.
-- **FR-014**: Results within the same relevance tier MUST be ordered by ticker, so that the same
-  query over unchanged data always returns the same list in the same order.
+- **FR-013**: Results MUST be ordered by ticker.
+- **FR-014**: Results with the same ticker MUST be ordered by id, so that the order is total and the
+  same query over unchanged data always returns the same list in the same order.
 - **FR-015**: Results MUST be paginated. The response MUST carry one page of results plus the
   page requested, the page size in force, and the total number of instruments that matched, so a
   caller can tell whether more exist and ask for them.
@@ -309,7 +296,7 @@ are absent.
   with tradable assets only, so every result is something the order endpoint accepts as a trade.
   On the provided dataset this excludes exactly one instrument, `ARS` / `PESOS` (id 66), leaving 65
   searchable; `ars` and `pesos` therefore return an empty list.
-- **FR-024**: Matching MUST be literal containment of the folded query (FR-003 to FR-005) and MUST
+- **FR-024**: Matching MUST be literal containment of the query (FR-003 to FR-005) and MUST
   NOT be tolerant to typos: a query that is not a substring of any ticker or name returns nothing.
   `bnaco` returns an empty list. The statement's "activos **similares** a la busqueda" is satisfied
   by the fact that one fragment returns the whole family of instruments that share it — `banco`
@@ -322,8 +309,8 @@ are absent.
   type `MONEDA` marks the pesos instrument, which is cash rather than an asset.
 - **Market data**: a daily price row per instrument, carrying `close` and `previousClose`. Only the
   instrument's latest row is read.
-- **Search query (input)**: the free text a user typed. Trimmed, folded for case and accents, and
-  matched as literal text.
+- **Search query (input)**: the free text a user typed. Trimmed, matched case-insensitively and
+  as literal text.
 - **Search result (derived)**: one matched instrument, carrying its identity plus its latest price
   and daily return. Not stored.
 
@@ -335,16 +322,15 @@ are absent.
   47, `Pampa Holding S.A.` — the ticker path works in any case and on a partial query.
 - **SC-002**: On the same dataset, searching `banco` returns exactly four instruments: `BPAT`,
   `BBAR`, `BHIP` and `BMA`.
-- **SC-003**: On the same dataset, searching `rio` returns four instruments including `MOLI`
-  (`Molinos Río de la Plata`), and searching `compania` returns `INTR`. Both would return fewer
-  without accent folding — three and zero respectively.
+- **SC-003**: On the same dataset, searching `río` returns `MOLI` (`Molinos Río de la Plata`) and
+  searching `compañía` returns `INTR`; without the accents they return `BHIP`, `OEST`, `RICH` and
+  nothing respectively.
 - **SC-004**: On the same dataset, searching `metr` returns exactly one result, not two, although
   the query matches both the ticker and the name of `METR`.
 - **SC-005**: On the same dataset, searching `a` — which matches 59 of the 65 searchable
   instruments — returns no more than one page, and the response states that 59 matched. Walking
   the pages of that query returns all 59 instruments exactly once, in the specified order.
-- **SC-006**: On the same dataset, searching `bma` returns `BMA` first, and searching `gr` returns
-  `GRIM` above `MOLA`.
+- **SC-006**: On the same dataset, searching `gr` returns its nine matches in ticker order.
 - **SC-007**: Two identical searches with no intervening data change return identical responses,
   including the order of the results.
 - **SC-008**: Every instrument returned carries an id that the order endpoint accepts, so a user
@@ -363,8 +349,8 @@ are absent.
 - The search is read-only and public: with no authentication there is no "my instruments" view, and
   every caller sees the same market ([ADR-0007](../../docs/adr/0007-out-of-scope-matching-engine-and-auth.md)).
 - **"Activos similares" means a fragment returns a family, not that typos are forgiven.** Confirmed
-  by the author on 2026-11-16: `banco` must return every bank, which partial, case- and
-  accent-insensitive containment already delivers (FR-003 to FR-005). Typo tolerance is explicitly
+  by the author on 2026-11-16: `banco` must return every bank, which partial, case-insensitive
+  containment already delivers (FR-003 to FR-005). Typo tolerance is explicitly
   not part of it (FR-024), so no similarity measure, threshold or database extension enters this
   feature. If it is ever wanted it is a new feature with its own decision to record, not a tweak
   to these rules.
@@ -384,19 +370,19 @@ are absent.
   way to reach them, and a client that wants the rest should not have to guess at a narrower
   query to get it. The total match count that pagination publishes also tells the caller how much
   they have not seen, which the flag only hinted at.
-- Accent folding is assumed to be the right default rather than exact matching, because the three
-  accented names in the dataset are otherwise unreachable from a keyboard-typed query — measured:
-  `rio` misses `Molinos Río de la Plata` and `compania` misses `Compañía Introductora` without it.
-- Relevance tiers are a presentation decision made here (not in the statement) so that the ordering
-  is testable; the tie-break on ticker exists so acceptance scenarios can assert an exact list.
+- **No accent folding and no relevance ranking**, decided by the author on 2026-11-16, replacing
+  the earlier draft of this spec, which required both. The search is one short JPQL query
+  ([ADR-0027](../../docs/adr/0027-instrument-search-is-one-short-jpql-query.md)). Accents affect 3 of the
+  66 names and only when the accented word is typed without them; their tickers always match.
+  `unaccent` is considered and deferred in the ADR.
 - The exact maximum query length, the default page size and the maximum page size are not set by
   the statement; concrete values are chosen at plan time, and the requirements above only demand
   that they exist, are stated, and are observable. They are **configuration, not constants**
   (FR-015c), decided by the author on 2026-11-16: the right page size depends on traffic nobody
   has measured yet, so it is a dial an operator turns rather than a number a release changes.
 - **The search itself is executed by the database**, decided by the author on 2026-11-16: the
-  filtering, the relevance ordering and the paging happen in the query, so only one page of rows
-  ever crosses the wire. This is a constraint on the implementation rather than on the behaviour
+  filtering, the ordering and the paging happen in the query, so only one page of rows ever
+  crosses the wire. This is a constraint on the implementation rather than on the behaviour
   — every requirement above is written in terms of what the caller observes and none of them
   changes — but it is recorded here because it was a deliberate choice between two designs, and
   because it is what the plan's ADR and its measurements have to justify.

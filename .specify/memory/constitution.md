@@ -1,5 +1,25 @@
 <!--
 Sync Impact Report
+- Version change: 2.2.0 → 2.3.0 (MINOR: materially expanded guidance)
+- Modified principles:
+  - VIII. Layers — no package becomes a catch-all: `service` is grouped by use case, each
+    `@Service` in its own subpackage with its request and response models, exceptions and
+    configuration, nothing at the root, use cases independent of each other, enforced by three
+    ArchUnit rules; the controller hands the service a raw request and never reads configuration;
+    `model` by concept, `controller` and `persistence` by role. Rationale extended
+- Modified sections: none
+- Added sections: none
+- Removed sections: none
+- Templates: not modified (they read this file at runtime)
+- Origin: instrument search moved its request value types out of `model/instrument` (they are
+  paging and validation, not business) and they were about to pile up flat in `service` next to
+  every service; the author reorganised by hand and asked for the rule. Revised the same day,
+  before release, after review: the first draft kept each `@Service` at the root of `service`
+  and its models in a sibling subpackage, which split every use case from its own request and
+  response, and left the controller reading configuration to validate the request
+- Deferred TODOs: none
+
+Previous report (2.2.0, 2026-11-16)
 - Version change: 2.1.0 → 2.2.0 (MINOR: materially expanded guidance)
 - Modified principles: none
 - Modified sections:
@@ -231,11 +251,23 @@ decisions, so an ADR missing from it is an ADR nobody will read.
   model signatures.
 - An interface is created only when the framework needs one (a Spring Data repository) or there
   are two real implementations. A service with one implementation is a class.
+- No package becomes a catch-all. `service` is grouped by use case: each `@Service` lives in its
+  own subpackage (`service/portfolio`, `service/search`) together with its request and response
+  models, its exceptions and its configuration; nothing sits at the root of `service`, and one
+  use case does not depend on another — enforced by ArchUnit. The controller hands the service a
+  raw request model and gets a response model back: validating the request against configured
+  limits is the use case's job, so the controller never reads configuration. `model` groups by
+  concept (`model/portfolio`), keeping at its root only what every concept shares
+  (`DecimalPolicy`). `controller` and `persistence` group by role (`dto`, `entity`, `mapper`). A
+  subpackage that starts holding a second concept is split in the same change that adds it.
 
 Rationale: the path of a request reads top to bottom in one service method, and principle V holds
 without test doubles because the model never reaches out. In 1.x (ports and adapters) model
 objects fetched their own data through ports, which scattered the orchestration across them.
-See ADR-0017.
+See ADR-0017. Grouping a use case with its own request and response models means a reader opens
+one package and sees the whole use case, and the package list says what the system does rather
+than what kinds of classes it has; grouping by concept keeps a growing layer from turning into a
+bag of unrelated types that a reader has to sort before they can read it.
 
 ### IX. Design for Change
 
@@ -320,4 +352,4 @@ nobody measured costs that readability and buys nothing anyone can show.
 - Compliance is checked at plan time (Constitution Check) and at review. Runtime guidance for
   developers lives in `README.md` and `docs/adr/`.
 
-**Version**: 2.2.0 | **Ratified**: 2026-11-15 | **Last Amended**: 2026-11-16
+**Version**: 2.3.0 | **Ratified**: 2026-11-15 | **Last Amended**: 2026-11-16

@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.cocos.trading.controller.dto.PortfolioResponse;
 import com.cocos.trading.model.user.UserId;
-import com.cocos.trading.service.PortfolioService;
+import com.cocos.trading.service.portfolio.PortfolioService;
 
 @RestController
 @RequestMapping("/api/v1/users/{userId}/portfolio")

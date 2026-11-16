@@ -64,6 +64,11 @@ There are two environments, because the provided database and a development data
 same thing. The one above is local. The provided one is **staging**: it is what the exercise is
 evaluated against, and nothing experimental runs on it.
 
+**The provided dataset is loaded only under the `local` profile** (ADR-0029). The default profile
+applies the schema migrations and nothing else, so an environment has to ask for the fixture data
+deliberately rather than remember to exclude it. `local` is set for you by the command above, by
+`./mvnw spring-boot:run`, and by the test suite; `staging` never activates it.
+
 **Staging: the provided database.** Credentials are never stored in this repository; they are
 read from the environment:
 
@@ -85,6 +90,31 @@ docker compose up -d
 ./mvnw spring-boot:run
 ```
 
+Both commands run under the `local` profile, so Flyway applies the schema migrations and then the
+provided dataset (`db/seed/R__given_dataset.sql`, a repeatable migration that resets the four tables
+before loading them). If you have a database from before ADR-0029, recreate it once with
+`docker compose down -v`.
+
+## Configuration
+
+Instrument search has three limits. They are configuration rather than constants, because the
+right page size depends on traffic nobody has measured — an operator turns the dial, a release does
+not change the number (ADR-0028). Spring Boot's relaxed binding gives the environment-variable
+spelling, so the same image serves a different default with one `-e` and no rebuild:
+
+| Property | Default | Environment variable | What it does |
+|---|---|---|---|
+| `trading.search.default-page-size` | `20` | `TRADING_SEARCH_DEFAULT_PAGE_SIZE` | The page size applied when a request sends no `size` |
+| `trading.search.max-page-size` | `100` | `TRADING_SEARCH_MAX_PAGE_SIZE` | The largest `size` a caller may ask for. Above it the request is **rejected, not clamped** |
+| `trading.search.max-query-length` | `64` | `TRADING_SEARCH_MAX_QUERY_LENGTH` | The longest accepted `query`, measured after trimming |
+
+The value in force is always observable: the response echoes `size`, and a rejection names the
+limit it enforced.
+
+```bash
+TRADING_SEARCH_DEFAULT_PAGE_SIZE=5 docker compose --profile app up -d --build
+```
+
 ## Tests
 
 ```bash
@@ -102,7 +132,7 @@ The build fails on unformatted code. To format it:
 | Method | Path | What it does |
 |---|---|---|
 | `GET` | `/api/v1/users/{userId}/portfolio` | Total account value, cash available to trade, and one entry per position with quantity, market value and total return |
-| `GET` | `/api/v1/instruments?query={text}` | Instruments matching the text by ticker or name |
+| `GET` | `/api/v1/instruments/search?query={text}` | One page of the instruments matching the text by ticker or name — partial and case-insensitive, ordered by ticker, never pesos (cash is not a tradable asset), each carrying its latest close and the day's move. Accents must be typed as they are stored: `río` finds *Molinos Río de la Plata*, `rio` does not (3 of 66 names; their tickers always match; `unaccent` considered and deferred, ADR-0027). Optional `page` and `size` |
 | `POST` | `/api/v1/orders` | Submits an order. `MARKET` fills immediately at the last close; `LIMIT` is accepted as `NEW` |
 | `POST` | `/api/v1/orders/{orderId}/cancel` | Cancels an order that is still `NEW` |
 
@@ -124,9 +154,10 @@ is a verbatim copy of that statement, taken from commit `abae7701`, and the Flyw
 
 <!-- ───────────── DELETE BEFORE DELIVERY ─────────────
 Pending, so the README never claims something that is not true yet:
- - the portfolio endpoint ships (feature 001-portfolio-endpoint); instrument search, order
-   submission and order cancellation are still a proposal to be confirmed
+ - the portfolio endpoint ships (feature 001-portfolio-endpoint) and instrument search ships
+   (feature 002-instrument-search); order submission and order cancellation are still a proposal
+   to be confirmed
  - `V2__portfolio_read_indexes.sql` adds the two `orders` indexes and the
-   `UNIQUE (instrumentid, date)` constraint on `marketdata`; there is still no migration for
-   `order_status_history`
+   `UNIQUE (instrumentid, date)` constraint on `marketdata`; instrument search needs no migration
+   (ADR-0027); there is still no migration for `order_status_history`
 ──────────────────────────────────────────────────── -->

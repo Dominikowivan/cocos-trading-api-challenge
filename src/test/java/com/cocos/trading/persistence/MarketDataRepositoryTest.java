@@ -45,6 +45,20 @@ class MarketDataRepositoryTest extends PersistenceTestBase {
 	}
 
 	@Test
+	void the_previous_close_comes_from_the_same_latest_row() {
+		assertThat(latestRowOf(PAMP).getPreviousClose()).isEqualByComparingTo("921.80");
+	}
+
+	@Test
+	@Sql("/db/fixtures/later-close-for-pamp.sql")
+	@Sql(scripts = "/db/fixtures/later-close-for-pamp-cleanup.sql", executionPhase = ExecutionPhase.AFTER_TEST_METHOD)
+	void the_latest_row_is_resolved_per_instrument_not_at_one_shared_date() {
+		assertThat(latestRowOf(PAMP).getClose()).isEqualByComparingTo("999.99");
+		assertThat(latestRowOf(PAMP).getPreviousClose()).isEqualByComparingTo("900.00");
+		assertThat(latestRowOf(METR).getClose()).isEqualByComparingTo("229.50");
+	}
+
+	@Test
 	void an_instrument_with_no_row_is_absent() {
 		assertThat(latestClosesOf(List.of(PGR, IRCP, ARS))).isEmpty();
 	}
@@ -62,8 +76,8 @@ class MarketDataRepositoryTest extends PersistenceTestBase {
 	@Sql("/db/fixtures/null-close.sql")
 	@Sql(scripts = "/db/fixtures/null-close-cleanup.sql", executionPhase = ExecutionPhase.AFTER_TEST_METHOD)
 	void a_latest_row_with_a_null_close_counts_as_no_known_price() {
-		List<LatestClose> rows = marketDataRepository
-			.findLatestCloses(MarketDataMapper.toInstrumentIdColumns(List.of(WITH_A_LATER_NULL_CLOSE)));
+		List<LatestMarketData> rows = marketDataRepository
+			.findLatestMarketData(MarketDataMapper.toInstrumentIdColumns(List.of(WITH_A_LATER_NULL_CLOSE)));
 
 		assertThat(rows).singleElement().satisfies(row -> assertThat(row.getClose()).isNull());
 		assertThat(MarketDataMapper.toCloses(rows).of(instrument(WITH_A_LATER_NULL_CLOSE))).isEmpty();
@@ -76,9 +90,16 @@ class MarketDataRepositoryTest extends PersistenceTestBase {
 
 	private Map<Long, BigDecimal> latestClosesOf(List<Long> instrumentIds) {
 		Map<Long, BigDecimal> closes = new HashMap<>();
-		marketDataRepository.findLatestCloses(MarketDataMapper.toInstrumentIdColumns(instrumentIds))
+		marketDataRepository.findLatestMarketData(MarketDataMapper.toInstrumentIdColumns(instrumentIds))
 			.forEach(row -> closes.put(row.getInstrumentId().longValue(), row.getClose()));
 		return closes;
+	}
+
+	private LatestMarketData latestRowOf(long instrumentId) {
+		List<LatestMarketData> rows = marketDataRepository
+			.findLatestMarketData(MarketDataMapper.toInstrumentIdColumns(List.of(instrumentId)));
+		assertThat(rows).hasSize(1);
+		return rows.getFirst();
 	}
 
 	private static InstrumentRef instrument(long instrumentId) {

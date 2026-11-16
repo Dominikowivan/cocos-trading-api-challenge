@@ -1,4 +1,4 @@
-package com.cocos.trading.service;
+package com.cocos.trading.service.portfolio;
 
 import java.util.List;
 
@@ -64,7 +64,7 @@ public class PortfolioService {
 
 	private Closes latestClosesOf(AccountSnapshot snapshot) {
 		return MarketDataMapper.toCloses(marketDataRepository
-			.findLatestCloses(MarketDataMapper.toInstrumentIdColumns(snapshot.heldInstrumentIds())));
+			.findLatestMarketData(MarketDataMapper.toInstrumentIdColumns(snapshot.heldInstrumentIds())));
 	}
 
 	private static void reportAnomalies(UserId userId, Portfolio portfolio) {

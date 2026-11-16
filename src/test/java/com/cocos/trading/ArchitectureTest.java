@@ -4,7 +4,9 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
+import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.tngtech.archunit.core.importer.ImportOption;
@@ -51,6 +53,21 @@ class ArchitectureTest {
 		.should()
 		.onlyDependOnClassesThat()
 		.resideInAnyPackage("java..", MODEL);
+
+	@ArchTest
+	static final ArchRule each_service_lives_in_its_use_case_package = classes().that()
+		.areAnnotatedWith(Service.class)
+		.should()
+		.resideInAPackage("com.cocos.trading.service.*");
+
+	@ArchTest
+	static final ArchRule nothing_sits_at_the_root_of_the_service_package = noClasses().should()
+		.resideInAPackage("com.cocos.trading.service");
+
+	@ArchTest
+	static final ArchRule use_cases_do_not_depend_on_each_other = slices().matching("com.cocos.trading.service.(*)..")
+		.should()
+		.notDependOnEachOther();
 
 	@ArchTest
 	static final ArchRule entities_do_not_leave_persistence = noClasses().that()

@@ -21,7 +21,11 @@ services:
     build: .
     container_name: trading-api
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/trading
+      - SPRING_PROFILES_ACTIVE=local
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/trading
+      - TRADING_SEARCH_DEFAULT_PAGE_SIZE
+      - TRADING_SEARCH_MAX_PAGE_SIZE
+      - TRADING_SEARCH_MAX_QUERY_LENGTH
     ports:
       - "8080:8080"
     depends_on:

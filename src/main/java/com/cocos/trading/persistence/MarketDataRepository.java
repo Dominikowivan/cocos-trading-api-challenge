@@ -11,19 +11,20 @@ import com.cocos.trading.persistence.entity.MarketDataEntity;
 
 public interface MarketDataRepository extends JpaRepository<MarketDataEntity, Integer> {
 
-	default List<LatestClose> findLatestCloses(Collection<Integer> instrumentIds) {
+	default List<LatestMarketData> findLatestMarketData(Collection<Integer> instrumentIds) {
 		if (instrumentIds.isEmpty()) {
 			return List.of();
 		}
-		return findLatestClosesOf(instrumentIds);
+		return findLatestMarketDataOf(instrumentIds);
 	}
 
 	@Query(value = """
-			SELECT DISTINCT ON (m.instrumentid) m.instrumentid AS "instrumentId", m.close AS "close"
+			SELECT DISTINCT ON (m.instrumentid) m.instrumentid AS "instrumentId", m.close AS "close",
+			       m.previousclose AS "previousClose"
 			FROM marketdata m
 			WHERE m.instrumentid IN (:instrumentIds)
 			ORDER BY m.instrumentid, m.date DESC
 			""", nativeQuery = true)
-	List<LatestClose> findLatestClosesOf(@Param("instrumentIds") Collection<Integer> instrumentIds);
+	List<LatestMarketData> findLatestMarketDataOf(@Param("instrumentIds") Collection<Integer> instrumentIds);
 
 }

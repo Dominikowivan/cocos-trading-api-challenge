@@ -49,3 +49,125 @@ Accept: application/json
 # Same bytes as the first request, position order included, with no intervening order (SC-006).
 GET {{host}}/api/v1/users/{{userId}}/portfolio
 Accept: application/json
+
+### Instrument search — an exact ticker
+# 200. One result: instrumentId 47, PAMP, Pampa Holding S.A., ACCIONES.
+# page 0, size 20 (the configured default), totalElements 1, totalPages 1.
+GET {{host}}/api/v1/instruments/search?query=PAMP
+Accept: application/json
+
+### Instrument search — the same ticker in lower case
+# Identical body: matching folds case on both sides, in SQL (FR-004).
+GET {{host}}/api/v1/instruments/search?query=pamp
+Accept: application/json
+
+### Instrument search — a partial ticker
+# Identical results, "query": "pam". Containment, not prefix (FR-003).
+GET {{host}}/api/v1/instruments/search?query=pam
+Accept: application/json
+
+### Instrument search — surrounding whitespace is trimmed
+# Identical body to the request above, with "query": "pamp" (FR-007).
+GET {{host}}/api/v1/instruments/search?query=%20%20pamp%20%20
+Accept: application/json
+
+### Instrument search — nothing matched is not an error
+# 200 with "results": [] and "totalElements": 0. The search ran; nothing matched (FR-011, SC-010).
+GET {{host}}/api/v1/instruments/search?query=ZZZZ
+Accept: application/json
+
+### Instrument search — cash is never a result
+# 200 with an empty page. Pesos are the currency assets are paid in, not a tradable asset, and the
+# MONEDA type is excluded (FR-023, ADR-0027). "pesos" is empty for the same reason.
+GET {{host}}/api/v1/instruments/search?query=ars
+Accept: application/json
+
+### Instrument search — a whitespace-only query is rejected
+# 400 application/problem+json, detail "The search query must not be blank" (FR-008).
+# Contrast with ZZZZ above: there the search ran, here it never did.
+GET {{host}}/api/v1/instruments/search?query=%20%20
+Accept: application/json
+
+### Instrument search — a missing query parameter is rejected
+# 400 application/problem+json, detail "Required request parameter 'query' is not present".
+GET {{host}}/api/v1/instruments/search
+Accept: application/json
+
+### Instrument search — a name fragment returns the family
+# 200 with four results, ticker ascending: BBAR, BHIP, BMA, BPAT. All four match on their name
+# (FR-002). "BANCO" returns the identical list.
+GET {{host}}/api/v1/instruments/search?query=banco
+Accept: application/json
+
+### Instrument search — an accented name, typed with its accent
+# 200 with one result: MOLI, Molinos Río de la Plata.
+GET {{host}}/api/v1/instruments/search?query=r%C3%ADo
+Accept: application/json
+
+### Instrument search — the same name, typed without it
+# 200 with three results, BHIP, OEST and RICH, and no MOLI: accents are not folded (FR-005,
+# ADR-0027). MOLI is still reachable by its ticker or by "molinos".
+GET {{host}}/api/v1/instruments/search?query=rio
+Accept: application/json
+
+### Instrument search — a typo matches nothing
+# 200 with an empty page. "bnaco" is a transposition of "banco"; matching is literal and the API
+# does not guess (FR-024).
+GET {{host}}/api/v1/instruments/search?query=bnaco
+Accept: application/json
+
+### Instrument search — results come in ticker order
+# 200 with nine results, ticker ascending (FR-013, FR-014):
+#   AGRO  GCLA  GGAL  GRIM  LOMA  MOLA  OEST  PGR  SUPV
+GET {{host}}/api/v1/instruments/search?query=gr
+Accept: application/json
+
+### Instrument search — a broad query is paged and says how much there is
+# 200. page 0, size 20, totalElements 59, totalPages 3, 20 results ending at CVH.
+GET {{host}}/api/v1/instruments/search?query=a
+Accept: application/json
+
+### Instrument search — the second page
+# 200. 20 results, DGCU2 … MOLA. Nothing repeated from page 0, nothing skipped.
+GET {{host}}/api/v1/instruments/search?query=a&page=1
+Accept: application/json
+
+### Instrument search — the last page
+# 200. 19 results, MOLI … YPFD. 20 + 20 + 19 = 59.
+GET {{host}}/api/v1/instruments/search?query=a&page=2
+Accept: application/json
+
+### Instrument search — a page past the last one
+# 200 with "results": [] and "totalElements": 59 — an empty page, not an error. An overshooting
+# client learns the real total rather than a 404 (FR-015b).
+GET {{host}}/api/v1/instruments/search?query=a&page=3
+Accept: application/json
+
+### Instrument search — the whole result set in one page
+# 200. size 59, totalPages 1, 59 results. A client that wants everything can ask, up to the
+# configured maximum.
+GET {{host}}/api/v1/instruments/search?query=a&size=59
+Accept: application/json
+
+### Instrument search — a size above the configured maximum is rejected, not clamped
+# 400 application/problem+json, detail "The page size must be between 1 and 100" (FR-015a).
+GET {{host}}/api/v1/instruments/search?query=a&size=500
+Accept: application/json
+
+### Instrument search — a negative page is rejected
+# 400 application/problem+json, detail "The page number must not be negative".
+GET {{host}}/api/v1/instruments/search?query=a&page=-1
+Accept: application/json
+
+### Instrument search — an instrument with no price is still an instrument
+# 200. instrumentId 3, PGR, with "close": null and "dailyReturnPercent": null — never 0
+# (ADR-0013). Prices are looked up after the match, so a missing one cannot drop the instrument.
+# PGR and IRCP are the two searchable instruments with no marketdata row.
+GET {{host}}/api/v1/instruments/search?query=pgr
+Accept: application/json
+
+### Instrument search — a known zero is a different answer from an unknown one
+# 200. AGRO carries "close": 138.00 and "dailyReturnPercent": 0.00 — it closed flat on
+# 2023-07-14. Contrast with PGR above, whose figures are null because they are unknown.
+GET {{host}}/api/v1/instruments/search?query=agro
+Accept: application/json

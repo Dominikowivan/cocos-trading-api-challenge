@@ -21,11 +21,19 @@ re-decides what an accepted ADR already settled; those are cited.
 > positions and why they were rejected are kept in those entries: the record of the exercise is
 > the reasoning, and a decision reads better next to the argument it beat.
 
+> **Superseded in part on 2026-11-16 by [ADR-0027](../../docs/adr/0027-instrument-search-is-one-short-jpql-query.md).**
+> After implementation the author judged the native search query too complex for the requirement
+> and replaced it with one short JPQL query. What changed: no accent folding (no `search_fold`, no
+> `V3` migration), no relevance tiers (ticker order), and prices come from the portfolio's
+> `findLatestCloses` instead of a lateral join. Pesos are still excluded.
+> The [spec](spec.md) and the ADR state the current behaviour; this document keeps the design as
+> it was planned.
+
 ## Measured facts this phase relied on
 
 Two sets of measurements, both taken on 2026-11-16, neither estimated.
 
-**The dataset**, parsed from `src/main/resources/db/seed/V1000__given_dataset.sql`:
+**The dataset**, parsed from `src/main/resources/db/seed/R__given_dataset.sql`:
 
 | Fact | Value |
 |---|---|
@@ -98,6 +106,9 @@ genuinely list or fetch.
 and most APIs call them, so a client guesses them correctly on the first try.
 
 ### R-102: The database executes the search
+
+**Superseded in part by ADR-0027 (2026-11-16):** the database still executes the search, but
+with one short JPQL query instead of the native statement below.
 
 **Decision**: one native query filters, ranks and pages; the service receives one page of rows
 already in order. SQL does the matching (`strpos` over folded text), the relevance tiering (a
@@ -178,6 +189,8 @@ author chose it over a documented alternative.
 
 ### R-103: One folding function in SQL, applied to both sides
 
+**Superseded by ADR-0027 (2026-11-16).**
+
 **Decision**: a migration creates one function, used on the stored columns **and** on the query
 parameter:
 
@@ -229,6 +242,8 @@ It is recorded in the plan's Complexity Tracking rather than passed over.
 - **Folding the query in Java, the columns in SQL** — the duplicated rule described in R-102.
 
 ### R-104: Relevance is a four-branch `CASE`, and the tie-break is the ticker
+
+**Superseded by ADR-0027 (2026-11-16).**
 
 **Decision**: the `ORDER BY` ranks exact ticker (1), ticker prefix (2), name prefix (3), anything
 else that matched (4), then orders by ticker ascending within a tier (FR-013, FR-014). The tier is
@@ -346,6 +361,8 @@ and cannot express FR-007's "trim, then check" without a custom validator. It al
 maximum from configuration: `@Size(max = …)` needs a compile-time constant.
 
 ### R-108: The page query reads the price; the portfolio's query is untouched
+
+**Superseded by ADR-0027 (2026-11-16).**
 
 **Decision**: the `LEFT JOIN LATERAL` in R-102's statement carries `close` and `previousclose` for
 the page's rows. `MarketDataRepository.findLatestCloses` and its `LatestClose` projection — the
@@ -548,9 +565,16 @@ what makes R-106's environment variables worth having).
 
 ## Open questions for the author
 
-Neither blocks implementation.
+**Both were answered by the author on 2026-11-16, before implementation.** The answer is recorded
+at the head of each question; the arguments below are kept as they were put.
 
 ### Q-101: Should `id` be the final tie-break in the ordering?
+
+**Answered: yes.** The ordering is `ORDER BY tier, ticker, id`, implemented in
+`InstrumentSearchRepository`. This **overrides the "not added" default** recorded below and the
+caveat in [R-104](#r-104-relevance-is-a-four-branch-case-and-the-tie-break-is-the-ticker), which
+should be read as the argument that was accepted rather than as the behaviour that shipped. The
+reasoning is carried into [ADR-0027](../../docs/adr/0027-the-database-executes-the-instrument-search.md).
 
 One extra sort key, `ORDER BY tier, ticker, id`. It costs nothing measurable and it closes the
 hole described in [R-104](#r-104-relevance-is-a-four-branch-case-and-the-tie-break-is-the-ticker):
@@ -566,6 +590,9 @@ instrument, not an error.
 feature, so it is worth ten seconds of the author's attention.
 
 ### Q-102: Should a counter record searches that page?
+
+**Answered: no.** The default stands and nothing was built: the service records no metric and logs
+nothing.
 
 A Micrometer counter when `totalElements` exceeds `size`. `spring-boot-starter-actuator` and
 `micrometer-registry-prometheus` are already dependencies and the Prometheus endpoint is already
