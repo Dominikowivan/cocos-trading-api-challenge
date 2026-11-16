@@ -18,9 +18,12 @@ public interface MarketDataRepository extends JpaRepository<MarketDataEntity, In
 		return findLatestClosesOf(instrumentIds);
 	}
 
-	@Query(value = "SELECT DISTINCT ON (m.instrumentid) m.instrumentid AS \"instrumentId\", m.close AS \"close\""
-			+ " FROM marketdata m WHERE m.instrumentid IN (:instrumentIds)"
-			+ " ORDER BY m.instrumentid, m.date DESC", nativeQuery = true)
+	@Query(value = """
+			SELECT DISTINCT ON (m.instrumentid) m.instrumentid AS "instrumentId", m.close AS "close"
+			FROM marketdata m
+			WHERE m.instrumentid IN (:instrumentIds)
+			ORDER BY m.instrumentid, m.date DESC
+			""", nativeQuery = true)
 	List<LatestClose> findLatestClosesOf(@Param("instrumentIds") Collection<Integer> instrumentIds);
 
 }
