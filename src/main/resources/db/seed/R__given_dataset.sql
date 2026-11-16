@@ -1,3 +1,5 @@
+TRUNCATE orders, marketdata, instruments, users RESTART IDENTITY CASCADE;
+
 INSERT INTO users (email,accountNumber) VALUES
    ('emiliano@test.com','10001'),
    ('jose@test.com','10002'),
