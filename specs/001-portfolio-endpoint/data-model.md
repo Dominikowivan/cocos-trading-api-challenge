@@ -74,7 +74,7 @@ ADR-0014). Entities are never passed into the model.
 | Repository | Query | Mapper |
 |---|---|---|
 | `UserRepository` | `existsById` | `UserMapper.toIdColumn(UserId)` — absent when the id is outside `INT`, so the user cannot exist |
-| `OrderRepository` | `findLedgerOf(userId, statuses)` | `OrderMapper.toOrders`, and `toStatusColumns` for the status parameter |
+| `OrderRepository` | `findOrdersOf(userId, statuses)` | `OrderMapper.toOrders`, and `toStatusColumns` for the status parameter |
 | `MarketDataRepository` | `findLatestCloses(instrumentIds)` → `List<LatestClose>` (typed projection, quoted aliases) — reads nothing for an empty list | `MarketDataMapper.toCloses` → `Closes` — a NULL `close` is dropped, so it reads as no price (R-019) |
 
 | Entity | Shape | Relationships |
@@ -228,7 +228,7 @@ made structural (R-009).
 
 1. `UserMapper.toIdColumn` + `UserRepository.existsById`; otherwise `UnknownUserException` → 404 (FR-024,
    R-014).
-2. `OrderRepository.findLedgerOf(userId, contributing statuses)` → `OrderMapper` → `AccountLedger` →
+2. `OrderRepository.findOrdersOf(userId, contributing statuses)` → `OrderMapper` → `AccountLedger` →
    `snapshot()`.
 3. `MarketDataRepository.findLatestCloses(snapshot.heldInstrumentIds())` → `MarketDataMapper` →
    `Portfolio.valued(snapshot, closes)`.

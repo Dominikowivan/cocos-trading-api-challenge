@@ -44,7 +44,7 @@ public class PortfolioService {
 	public Portfolio portfolioOf(UserId userId) {
 		Integer userIdColumn = requireExisting(userId);
 
-		AccountSnapshot snapshot = new AccountLedger(ledgerOf(userIdColumn)).snapshot();
+		AccountSnapshot snapshot = new AccountLedger(ordersOf(userIdColumn)).snapshot();
 		Portfolio portfolio = Portfolio.valued(snapshot, latestClosesOf(snapshot));
 
 		reportAnomalies(userId, portfolio);
@@ -57,9 +57,9 @@ public class PortfolioService {
 			.orElseThrow(() -> new UnknownUserException(userId));
 	}
 
-	private List<Order> ledgerOf(Integer userIdColumn) {
+	private List<Order> ordersOf(Integer userIdColumn) {
 		return OrderMapper.toOrders(
-				orderRepository.findLedgerOf(userIdColumn, OrderMapper.toStatusColumns(OrderStatus.contributing())));
+				orderRepository.findOrdersOf(userIdColumn, OrderMapper.toStatusColumns(OrderStatus.contributing())));
 	}
 
 	private Closes latestClosesOf(AccountSnapshot snapshot) {

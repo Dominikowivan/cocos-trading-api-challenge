@@ -30,18 +30,18 @@ class OrderRepositoryTest extends PersistenceTestBase {
 
 	@Test
 	void cancelled_and_rejected_rows_are_never_returned() {
-		List<Order> ledger = ledgerOf(SEEDED);
+		List<Order> orders = ordersOf(SEEDED);
 
-		assertThat(ledger).isNotEmpty();
-		assertThat(ledger).allSatisfy(order -> assertThat(order.status()).isIn(OrderStatus.FILLED, OrderStatus.NEW));
-		assertThat(ledger).hasSize(9);
+		assertThat(orders).isNotEmpty();
+		assertThat(orders).allSatisfy(order -> assertThat(order.status()).isIn(OrderStatus.FILLED, OrderStatus.NEW));
+		assertThat(orders).hasSize(9);
 	}
 
 	@Test
 	void rows_come_back_in_datetime_then_id_order() {
-		List<Order> ledger = ledgerOf(SEEDED);
+		List<Order> orders = ordersOf(SEEDED);
 
-		assertThat(ledger).isSortedAccordingTo(
+		assertThat(orders).isSortedAccordingTo(
 				Comparator.comparing(Order::occurredAt).thenComparing(Order::orderId));
 	}
 
@@ -50,27 +50,27 @@ class OrderRepositoryTest extends PersistenceTestBase {
 		Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
 		statistics.clear();
 
-		List<Order> ledger = ledgerOf(SEEDED);
+		List<Order> orders = ordersOf(SEEDED);
 
-		assertThat(ledger).allSatisfy(order -> assertThat(order.instrument().ticker()).isNotBlank());
+		assertThat(orders).allSatisfy(order -> assertThat(order.instrument().ticker()).isNotBlank());
 		assertThat(statistics.getPrepareStatementCount()).isEqualTo(1);
 	}
 
 	@Test
 	void another_users_rows_never_appear() {
-		assertThat(ledgerOf(NEVER_TRADED)).isEmpty();
+		assertThat(ordersOf(NEVER_TRADED)).isEmpty();
 	}
 
 	@Test
 	void the_cash_instrument_is_mapped_as_cash() {
-		List<Order> ledger = ledgerOf(SEEDED);
+		List<Order> orders = ordersOf(SEEDED);
 
-		assertThat(ledger).anySatisfy(order -> assertThat(order.instrument().isCash()).isTrue());
+		assertThat(orders).anySatisfy(order -> assertThat(order.instrument().isCash()).isTrue());
 	}
 
-	private List<Order> ledgerOf(Integer userId) {
+	private List<Order> ordersOf(Integer userId) {
 		return OrderMapper.toOrders(
-				orderRepository.findLedgerOf(userId, OrderMapper.toStatusColumns(OrderStatus.contributing())));
+				orderRepository.findOrdersOf(userId, OrderMapper.toStatusColumns(OrderStatus.contributing())));
 	}
 
 }
