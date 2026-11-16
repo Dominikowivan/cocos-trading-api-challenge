@@ -19,8 +19,7 @@ class ValuationShortPositionTest {
 
 	@Test
 	void a_short_holding_is_listed_with_its_negative_quantity() {
-		Portfolio portfolio = valuedOver(
-				filledBuy(BMA, 20, "1540", "2023-07-13T12:51:20"),
+		Portfolio portfolio = valuedOver(filledBuy(BMA, 20, "1540", "2023-07-13T12:51:20"),
 				filledSell(BMA, 30, "1530", "2023-07-13T15:13:20"));
 
 		assertThat(portfolio.positions()).hasSize(1);
@@ -29,8 +28,7 @@ class ValuationShortPositionTest {
 
 	@Test
 	void a_short_holding_is_reported_exactly_once() {
-		Portfolio portfolio = valuedOver(
-				filledBuy(BMA, 20, "1540", "2023-07-13T12:51:20"),
+		Portfolio portfolio = valuedOver(filledBuy(BMA, 20, "1540", "2023-07-13T12:51:20"),
 				filledSell(BMA, 30, "1530", "2023-07-13T15:13:20"));
 
 		assertThat(portfolio.shortPositions()).hasSize(1);

@@ -28,14 +28,22 @@ class ArchitectureTest {
 	@ArchTest
 	static final ArchRule calls_flow_from_controller_to_service_to_persistence = layeredArchitecture()
 		.consideringOnlyDependenciesInLayers()
-		.layer("Controller").definedBy(CONTROLLER)
-		.layer("Service").definedBy(SERVICE)
-		.layer("Model").definedBy(MODEL)
-		.layer("Persistence").definedBy(PERSISTENCE)
-		.whereLayer("Controller").mayNotBeAccessedByAnyLayer()
-		.whereLayer("Service").mayOnlyBeAccessedByLayers("Controller")
-		.whereLayer("Persistence").mayOnlyBeAccessedByLayers("Service")
-		.whereLayer("Model").mayOnlyBeAccessedByLayers("Controller", "Service", "Persistence");
+		.layer("Controller")
+		.definedBy(CONTROLLER)
+		.layer("Service")
+		.definedBy(SERVICE)
+		.layer("Model")
+		.definedBy(MODEL)
+		.layer("Persistence")
+		.definedBy(PERSISTENCE)
+		.whereLayer("Controller")
+		.mayNotBeAccessedByAnyLayer()
+		.whereLayer("Service")
+		.mayOnlyBeAccessedByLayers("Controller")
+		.whereLayer("Persistence")
+		.mayOnlyBeAccessedByLayers("Service")
+		.whereLayer("Model")
+		.mayOnlyBeAccessedByLayers("Controller", "Service", "Persistence");
 
 	@ArchTest
 	static final ArchRule the_model_is_plain_java = classes().that()
