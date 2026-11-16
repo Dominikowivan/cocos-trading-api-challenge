@@ -18,6 +18,11 @@ spring:
   jackson:
     write:
       write-bigdecimal-as-plain: true
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
 
 ---
 spring:
