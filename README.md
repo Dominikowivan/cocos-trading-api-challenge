@@ -97,23 +97,32 @@ before loading them). If you have a database from before ADR-0029, recreate it o
 
 ## Configuration
 
-Instrument search has three limits. They are configuration rather than constants, because the
-right page size depends on traffic nobody has measured — an operator turns the dial, a release does
-not change the number (ADR-0028). Spring Boot's relaxed binding gives the environment-variable
-spelling, so the same image serves a different default with one `-e` and no rebuild:
+Every setting below is declared in `application.yaml` as `${ENVIRONMENT_VARIABLE:default}`, so the
+same image serves a different value with one `-e` and no rebuild.
+
+Paging is Spring Data's (ADR-0032): a `size` above the maximum is lowered to it, a `size` below 1
+falls back to the default, and a negative `page` is read as `0`. The limits are global — they apply
+to every endpoint that takes a `Pageable` — and the response echoes the `page` and `size` actually
+served:
 
 | Property | Default | Environment variable | What it does |
 |---|---|---|---|
-| `trading.search.default-page-size` | `20` | `TRADING_SEARCH_DEFAULT_PAGE_SIZE` | The page size applied when a request sends no `size` |
-| `trading.search.max-page-size` | `100` | `TRADING_SEARCH_MAX_PAGE_SIZE` | The largest `size` a caller may ask for. Above it the request is **rejected, not clamped** |
-| `trading.search.max-query-length` | `64` | `TRADING_SEARCH_MAX_QUERY_LENGTH` | The longest accepted `query`, measured after trimming |
-
-The value in force is always observable: the response echoes `size`, and a rejection names the
-limit it enforced.
+| `spring.data.web.pageable.default-page-size` | `20` | `SPRING_DATA_WEB_PAGEABLE_DEFAULT_PAGE_SIZE` | The page size applied when a request sends no `size` |
+| `spring.data.web.pageable.max-page-size` | `100` | `SPRING_DATA_WEB_PAGEABLE_MAX_PAGE_SIZE` | The largest page served. A larger `size` is **lowered to it** |
+| `trading.search.max-query-length` | `64` | `TRADING_SEARCH_MAX_QUERY_LENGTH` | The longest accepted `query`, measured after trimming. Above it the search is a `400` naming the limit |
 
 ```bash
-TRADING_SEARCH_DEFAULT_PAGE_SIZE=5 docker compose --profile app up -d --build
+SPRING_DATA_WEB_PAGEABLE_DEFAULT_PAGE_SIZE=5 docker compose --profile app up -d --build
 ```
+
+The database access has a deadline and a bounded pool (ADR-0031). When either runs out the API
+answers `503` with a problem detail, instead of holding the request open:
+
+| Property | Default | Environment variable | What it does |
+|---|---|---|---|
+| `spring.transaction.default-timeout` | `10s` | `SPRING_TRANSACTION_DEFAULT_TIMEOUT` | The longest a request's transaction may run. Past it, the running query is cancelled |
+| `spring.datasource.hikari.maximum-pool-size` | `10` | `SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE` | Connections per instance. Times the number of instances, it must stay below the database's `max_connections` |
+| `spring.datasource.hikari.connection-timeout` | `5000` (ms) | `SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT` | The longest a request waits for a free connection. A plain number of milliseconds: Hikari does not read `5s` |
 
 ## Tests
 

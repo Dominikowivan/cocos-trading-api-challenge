@@ -12,8 +12,9 @@ import com.cocos.trading.persistence.entity.InstrumentEntity;
 
 public interface InstrumentRepository extends JpaRepository<InstrumentEntity, Integer> {
 
-	default Page<InstrumentEntity> searchNonCash(String text, int page, int size) {
-		return search(text, InstrumentRef.CASH, PageRequest.of(page, size));
+	default Page<InstrumentEntity> searchNonCash(String text, Pageable pageable) {
+		Pageable unsorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
+		return search(text, InstrumentRef.CASH, unsorted);
 	}
 
 	@Query("""

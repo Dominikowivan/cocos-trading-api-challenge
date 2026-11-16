@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test;
 
 class SearchQueryTest {
 
-	private static final SearchLimits LIMITS = new SearchLimits(64, 20, 100);
+	private static final SearchLimits LIMITS = new SearchLimits(64);
 
 	@Test
 	void surrounding_whitespace_is_trimmed() {
@@ -39,8 +39,9 @@ class SearchQueryTest {
 
 	@Test
 	void one_character_over_the_configured_maximum_is_rejected_and_the_message_names_it() {
-		assertThatThrownBy(() -> SearchQuery.of("x".repeat(65), LIMITS))
-			.isInstanceOf(InvalidSearchRequestException.class)
+		String tooLong = "x".repeat(65);
+
+		assertThatThrownBy(() -> SearchQuery.of(tooLong, LIMITS)).isInstanceOf(InvalidSearchRequestException.class)
 			.hasMessage("The search query must be at most 64 characters");
 	}
 
@@ -56,10 +57,10 @@ class SearchQueryTest {
 
 	@Test
 	void the_maximum_is_the_configured_one_not_a_constant() {
-		SearchLimits shorter = new SearchLimits(10, 20, 100);
+		SearchLimits shorter = new SearchLimits(10);
+		String tooLong = "x".repeat(11);
 
-		assertThatThrownBy(() -> SearchQuery.of("x".repeat(11), shorter))
-			.isInstanceOf(InvalidSearchRequestException.class)
+		assertThatThrownBy(() -> SearchQuery.of(tooLong, shorter)).isInstanceOf(InvalidSearchRequestException.class)
 			.hasMessage("The search query must be at most 10 characters");
 	}
 

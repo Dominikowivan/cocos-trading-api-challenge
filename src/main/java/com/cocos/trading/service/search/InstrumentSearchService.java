@@ -3,6 +3,7 @@ package com.cocos.trading.service.search;
 import java.util.List;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,17 +34,13 @@ public class InstrumentSearchService {
 
 	public InstrumentMatches search(SearchRequest request) {
 		SearchQuery query = SearchQuery.of(request.query(), limits);
-		SearchPage page = SearchPage.of(request.page(), request.size(), limits);
-		Page<InstrumentRef> instruments = instrumentsMatching(query, page);
+		Page<InstrumentRef> instruments = InstrumentSearchMapper
+			.toInstrumentRefs(instrumentRepository.searchNonCash(query.text(), request.pageable()));
+		List<InstrumentMatch> priced = InstrumentMatch.priced(instruments.getContent(),
+				dailyClosesOf(instruments.getContent()));
 
 		return new InstrumentMatches(query,
-				InstrumentMatch.priced(instruments.getContent(), dailyClosesOf(instruments.getContent())), page,
-				instruments.getTotalElements());
-	}
-
-	private Page<InstrumentRef> instrumentsMatching(SearchQuery query, SearchPage page) {
-		return InstrumentSearchMapper
-			.toInstrumentRefs(instrumentRepository.searchNonCash(query.text(), page.number(), page.size()));
+				new PageImpl<>(priced, instruments.getPageable(), instruments.getTotalElements()));
 	}
 
 	private DailyCloses dailyClosesOf(List<InstrumentRef> instruments) {

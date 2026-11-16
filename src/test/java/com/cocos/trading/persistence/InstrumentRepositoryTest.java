@@ -8,6 +8,7 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 
 import com.cocos.trading.persistence.entity.InstrumentEntity;
 
@@ -117,7 +118,7 @@ class InstrumentRepositoryTest extends PersistenceTestBase {
 	}
 
 	private Page<InstrumentEntity> pageOf(String query, int page) {
-		return instrumentRepository.searchNonCash(query, page, DEFAULT_SIZE);
+		return instrumentRepository.searchNonCash(query, PageRequest.of(page, DEFAULT_SIZE));
 	}
 
 	private List<String> tickersOnPage(String query, int page) {

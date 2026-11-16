@@ -37,5 +37,8 @@ currently holds; the journal is the authority on how it was reached.**
 | [0025](0025-the-api-runs-in-docker.md) | The API runs in Docker with one command | Accepted |
 | [0026](0026-actuator-exposes-health-and-prometheus.md) | Actuator exposes health and Prometheus metrics, and nothing collects them here | Accepted |
 | [0027](0027-instrument-search-is-one-short-jpql-query.md) | Instrument search is one short JPQL query | Accepted |
-| [0028](0028-search-results-are-paginated.md) | Search results are paginated, with a total count | Accepted |
+| [0028](0028-search-results-are-paginated.md) | Search results are paginated, with a total count | Accepted; partly superseded by [0032](0032-paging-is-spring-datas-pageable.md) |
 | [0029](0029-the-provided-dataset-is-an-opt-in-repeatable-seed.md) | The provided dataset is an opt-in repeatable seed, not a versioned migration | Accepted |
+| [0030](0030-the-schema-requires-columns-not-business-rules.md) | The schema requires the columns the code cannot read without, and nothing more | Accepted |
+| [0031](0031-database-access-has-a-deadline-and-a-bounded-pool.md) | Database access has a deadline and a bounded pool, and running out of either is a 503 | Accepted |
+| [0032](0032-paging-is-spring-datas-pageable.md) | Paging is Spring Data's `Pageable`, and out-of-range values are adjusted, not rejected | Accepted |

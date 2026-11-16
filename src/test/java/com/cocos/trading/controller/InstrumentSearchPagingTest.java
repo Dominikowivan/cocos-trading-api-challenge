@@ -2,7 +2,6 @@ package com.cocos.trading.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -76,26 +75,42 @@ class InstrumentSearchPagingTest extends WebTestBase {
 	}
 
 	@Test
-	void a_size_above_the_configured_maximum_is_rejected_rather_than_clamped() throws Exception {
+	void a_size_above_the_configured_maximum_is_clamped_and_the_response_says_so() throws Exception {
 		mvc.perform(get(INSTRUMENT_SEARCH).param("query", "a").param("size", "500"))
-			.andExpect(status().isBadRequest())
-			.andExpect(content().contentTypeCompatibleWith("application/problem+json"))
-			.andExpect(jsonPath("$.detail").value("The page size must be between 1 and 100"));
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.size").value(100))
+			.andExpect(jsonPath("$.totalPages").value(1))
+			.andExpect(jsonPath("$.results.length()").value(59));
 	}
 
 	@Test
-	void a_size_of_zero_is_rejected() throws Exception {
+	void a_size_of_zero_falls_back_to_the_default() throws Exception {
 		mvc.perform(get(INSTRUMENT_SEARCH).param("query", "a").param("size", "0"))
-			.andExpect(status().isBadRequest())
-			.andExpect(jsonPath("$.detail").value("The page size must be between 1 and 100"));
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.size").value(20));
 	}
 
 	@Test
-	void a_negative_page_is_rejected() throws Exception {
+	void a_negative_page_is_read_as_the_first_page() throws Exception {
 		mvc.perform(get(INSTRUMENT_SEARCH).param("query", "a").param("page", "-1"))
-			.andExpect(status().isBadRequest())
-			.andExpect(content().contentTypeCompatibleWith("application/problem+json"))
-			.andExpect(jsonPath("$.detail").value("The page number must not be negative"));
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.page").value(0))
+			.andExpect(jsonPath("$.results[0].ticker").value("AGRO"));
+	}
+
+	@Test
+	void a_sort_sent_by_the_caller_is_ignored_and_the_order_stays_ticker_then_id() throws Exception {
+		List<String> sortedByNameDescending = tickersOf(
+				mvc.perform(get(INSTRUMENT_SEARCH).param("query", "gr").param("sort", "name,desc")));
+
+		assertThat(sortedByNameDescending).isEqualTo(tickersOf(search("gr")));
+	}
+
+	@Test
+	void a_sort_on_a_field_that_does_not_exist_is_ignored_rather_than_failing() throws Exception {
+		mvc.perform(get(INSTRUMENT_SEARCH).param("query", "gr").param("sort", "nonsense"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.totalElements").value(9));
 	}
 
 	@Test
@@ -112,7 +127,7 @@ class InstrumentSearchPagingTest extends WebTestBase {
 	}
 
 	@Nested
-	@SpringBootTest(properties = "trading.search.default-page-size=5")
+	@SpringBootTest(properties = "spring.data.web.pageable.default-page-size=5")
 	@AutoConfigureMockMvc
 	@Import({ TestcontainersConfiguration.class, ContractValidationConfiguration.class })
 	class WithAConfiguredDefaultPageSize {

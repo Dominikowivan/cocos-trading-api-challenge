@@ -2,12 +2,10 @@ package com.cocos.trading.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.test.web.servlet.ResultActions;
 
 class InstrumentSearchPricesTest extends WebTestBase {
 

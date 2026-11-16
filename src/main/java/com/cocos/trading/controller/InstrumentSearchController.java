@@ -1,5 +1,6 @@
 package com.cocos.trading.controller;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -20,9 +21,8 @@ class InstrumentSearchController {
 	}
 
 	@GetMapping
-	InstrumentSearchResponse search(@RequestParam String query, @RequestParam(defaultValue = "0") int page,
-			@RequestParam(required = false) Integer size) {
-		return InstrumentSearchResponse.of(instrumentSearchService.search(new SearchRequest(query, page, size)));
+	InstrumentSearchResponse search(@RequestParam String query, Pageable pageable) {
+		return InstrumentSearchResponse.of(instrumentSearchService.search(new SearchRequest(query, pageable)));
 	}
 
 }
