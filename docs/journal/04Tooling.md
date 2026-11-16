@@ -31,5 +31,8 @@ como parte del entregable de cada feature la modificación de esa collection.
 
 Vamos con esto, no paso por Spec Kit porque son requerimientos técnicos. Van a dejar ADR seguro, y eso más la intención de este journal funcionan ya como suficiente documentación.
 
+# Dockerfile
+Sumamos un dockerfile para portabilidad y que sea facil levantar la app con solo tener docker.
+
 # Métricas
 TBD

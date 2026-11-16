@@ -45,25 +45,22 @@ The two documents are not the same content in two registers, and neither replace
 
 ## Requirements
 
-- JDK 21
-- Docker — for the local database and for Testcontainers
+- Docker — to run the API, and for the local database and Testcontainers
+- JDK 21 — only to build, test or run it outside Docker
 
 ## Running it
 
-There are two environments, because the provided database and a development database are not the
-same thing. The provided one is **staging**: it is what the exercise is evaluated against, and
-nothing experimental runs on it.
-
-**Default: a local database.** Brings up PostgreSQL in Docker, applies the migrations and loads
-the provided dataset:
+Only Docker is needed. This builds the API inside a container and starts it on
+<http://localhost:8080>, with a local **PostgreSQL 18.7** (the same version as the provided
+database) holding the provided dataset:
 
 ```bash
-docker compose up -d
-./mvnw spring-boot:run
+docker compose --profile app up --build
 ```
 
-The container publishes port **5433**, not 5432, so it does not collide with a PostgreSQL already
-installed on the machine. It runs **PostgreSQL 18.7**, the same version as the provided database.
+There are two environments, because the provided database and a development database are not the
+same thing. The one above is local. The provided one is **staging**: it is what the exercise is
+evaluated against, and nothing experimental runs on it.
 
 **Staging: the provided database.** Credentials are never stored in this repository; they are
 read from the environment:
@@ -74,6 +71,16 @@ export COCOS_DB_USER="<user>"
 export COCOS_DB_PASSWORD="<password>"
 
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=staging
+```
+
+## Development
+
+To work on the code, run only the database in Docker and the API from the IDE or the Maven wrapper:
+it restarts in seconds after a change and takes a debugger with no extra setup.
+
+```bash
+docker compose up -d
+./mvnw spring-boot:run
 ```
 
 ## Tests

@@ -3,7 +3,7 @@
 # The statement's optional "collection for Postman, Insomnia or REST Client" (research R-023).
 # Runs as-is in IntelliJ's HTTP Client and in the VS Code REST Client extension.
 #
-# Prerequisites: docker compose up -d && ./mvnw spring-boot:run
+# Prerequisites: docker compose --profile app up --build
 # Expected figures and the reasoning behind them:
 #   specs/001-portfolio-endpoint/quickstart.md
 # Response contract:
