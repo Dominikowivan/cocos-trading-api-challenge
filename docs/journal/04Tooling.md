@@ -13,7 +13,8 @@ Vamos a ir con el spring java format. El proyecto es principalmente springboot, 
 que van en el BOM. Pienso que es lo mas consistente y coherente mantenernos en el framework.
 
 # Sonar
-Revision estatica de codigo y vulnerabilidades Para agregar al CI. No empecemos a acumular issues y deuda tecnica.
+Revision estatica de codigo para agregar al CI. No empecemos a acumular issues y deuda tecnica.
+Perfecto! hubo que tunear un par de configs pero salio andando y encontro 4 issues con los que estoy de acuerdo. Fixed y pusheados.
 
 # Documentacion de la api
 Estaba pensando swagger, pero si en el entregable damos un postman collection como pide el mail, esto no va a hacer falta.
