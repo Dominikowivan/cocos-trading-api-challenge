@@ -35,3 +35,4 @@ currently holds; the journal is the authority on how it was reached.**
 | [0023](0023-dependency-and-secret-scanning-with-trivy.md) | Dependencies and secrets are scanned with Trivy in CI | Accepted |
 | [0024](0024-every-response-is-validated-against-the-contract.md) | One living API contract, and every response in the web tests is validated against it | Accepted |
 | [0025](0025-the-api-runs-in-docker.md) | The API runs in Docker with one command | Accepted |
+| [0026](0026-actuator-exposes-health-and-prometheus.md) | Actuator exposes health and Prometheus metrics, and nothing collects them here | Accepted |

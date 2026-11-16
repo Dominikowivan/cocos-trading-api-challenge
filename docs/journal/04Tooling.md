@@ -35,7 +35,10 @@ es siempre válida.
 Vamos con esto, no paso por Spec Kit porque son requerimientos técnicos. Van a dejar ADR seguro, y eso más la intención de este journal funcionan ya como suficiente documentación.
 
 # Dockerfile
-Sumamos un dockerfile para portabilidad y que sea facil levantar la app con solo tener docker.
+Sumamos un Dockerfile para portabilidad y que sea fácil levantar la app con solo tener Docker.
 
 # Métricas
-TBD
+Vamos a sumar Actuator de Spring, que ya nos da health y trae Micrometer, que mide las golden signals clásicas.
+Vamos a exponer con formato para Prometheus, pero de ser necesario usar otra herramienta de observabilidad, se
+cambia fácilmente con una configuración y poniendo la dependencia del registry correspondiente.
+No voy a instalar Prometheus para este ejemplito, la herramienta de observabilidad suele ser cross-apis, no tiene sentido que viva como parte de este proyecto. Sin contar que si se cae la api, se cae Prometheus también.
