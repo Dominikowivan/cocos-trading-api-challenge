@@ -23,3 +23,7 @@ currently holds; the journal is the authority on how it was reached.**
 | [0011](0011-ci-with-github-actions-and-jacoco.md) | CI on GitHub Actions, with coverage reported | Accepted |
 | [0012](0012-ledger-anomalies-are-reported-not-hidden.md) | A ledger anomaly is served as-is and logged as an error | Accepted |
 | [0013](0013-unknown-money-is-absent-never-zero.md) | An unknown money figure is absent, never zero | Accepted |
+| [0014](0014-data-access-with-spring-data-jpa.md) | Data access with Spring Data JPA, mapped by hand | Accepted |
+| [0015](0015-the-account-snapshot-is-the-folds-contract.md) | The fold returns one account snapshot | Accepted |
+| [0016](0016-decimal-scale-and-rounding-policy.md) | One decimal scale and rounding policy | Accepted |
+| [0017](0017-layers-with-a-service-that-orchestrates.md) | Layers, with a service that orchestrates and a pure model | Accepted |

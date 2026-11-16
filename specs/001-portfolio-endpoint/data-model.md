@@ -2,9 +2,10 @@
 
 **Feature**: `001-portfolio-endpoint` | **Date**: 2026-11-15 | **Plan**: [plan.md](plan.md)
 
-Three layers, deliberately distinct: the **given schema** (unchanged), the **persistence adapter**
-that reads it, and the **domain model** the rules are written against. Nothing from the first two
-appears in a domain signature (constitution VIII).
+Three layers, deliberately distinct: the **given schema** (unchanged), the **persistence layer**
+that reads it (repositories, entities, mappers), and the **model** the rules are written against. Nothing
+from the first two appears in a model signature, and the model never calls persistence: the
+service reads, maps and hands the model its data (constitution VIII, ADR-0017).
 
 ## 1. Given schema (read as-is)
 
@@ -50,11 +51,13 @@ positions table and no balance column, by ADR-0002.
 
 ```sql
 CREATE INDEX        idx_orders_userid_status        ON orders     (userid, status);
-CREATE INDEX        idx_orders_userid_instrumentid  ON orders     (userid, instrumentid);
 CREATE UNIQUE INDEX uq_marketdata_instrumentid_date ON marketdata (instrumentid, date);
 ```
 
-The third adds a **constraint**, not just an index: one price row per instrument per day, which the
+`(userid, instrumentid)`, which ADR-0002 also names, is **not** here: no query of this feature
+reads it, so it arrives with the first feature whose query does (R-018).
+
+The second adds a **constraint**, not just an index: one price row per instrument per day, which the
 given schema never stated. It protects against a duplicate feed delivery and it is the index the
 latest-close query reads, which is why that query carries no tiebreak. Permitted by constitution VI
 ("schema constraints that protect integrity are allowed") — it constrains shape, not money. The
@@ -62,10 +65,17 @@ provided dataset satisfies it (measured: one row per `(instrumentid, date)` acro
 **staging is unmeasured**, and if it holds a duplicate the migration fails there, which is the
 constraint doing its job.
 
-## 2. Persistence adapter
+## 2. Persistence
 
-JPA entities, one per table, in `adapter/persistence`. They exist to be read and hand-mapped
-(R-001); they are never passed into the domain.
+JPA entities, one per table, in `persistence/entity`, read through Spring Data repositories in
+`persistence` and turned into model values by hand-written mappers in `persistence/mapper` (R-001,
+ADR-0014). Entities are never passed into the model.
+
+| Repository | Query | Mapper |
+|---|---|---|
+| `UserRepository` | `existsById` | `UserMapper.toIdColumn(UserId)` — absent when the id is outside `INT`, so the user cannot exist |
+| `OrderRepository` | `findLedgerOf(userId, statuses)` | `OrderMapper.toOrders`, and `toStatusColumns` for the status parameter |
+| `MarketDataRepository` | `findLatestCloses(instrumentIds)` → `List<LatestClose>` (typed projection, quoted aliases) — reads nothing for an empty list | `MarketDataMapper.toCloses` → `Closes` — a NULL `close` is dropped, so it reads as no price (R-019) |
 
 | Entity | Shape | Relationships |
 |---|---|---|
@@ -83,29 +93,30 @@ Two queries serve the feature:
 | ledger | `select o from OrderEntity o join fetch o.instrument where o.userId = :userId and o.status in :statuses order by o.datetime asc, o.id asc` | the user's orders in the statuses the fold uses |
 | latest close | native `SELECT DISTINCT ON (instrumentid) …` (R-002) | one `(instrumentId, close)` per requested instrument; **absent** means no row |
 
-`:statuses` is **not** a literal in the SQL: the domain names the set — `OrderStatus.contributing()`
-returns `FILLED` and `NEW` — and `AccountLedger` passes it through the port, so the adapter never
-decides which statuses matter (R-024). `CANCELLED` and `REJECTED` rows are therefore never read nor
+`:statuses` is **not** a literal in the SQL: the model names the set — `OrderStatus.contributing()`
+returns `FILLED` and `NEW` — and the service passes it to the repository, so persistence never decides
+which statuses matter (R-024). `CANCELLED` and `REJECTED` rows are therefore never read nor
 mapped, and the predicate is served by `idx_orders_userid_status`. What each status *means* stays in
-`LedgerEntry` (FR-004).
+`Order` (FR-004).
 
-## 3. Domain model
+## 3. Model
 
-Plain Java. No Spring, Jakarta, JPA or web type (constitution VIII); no comments (VII); behaviour
-over state (IX).
+Plain Java. No Spring, Jakarta, JPA or web type, and no reference to a repository or service
+(constitution VIII); no comments (VII); behaviour over state (IX). It receives data and returns
+data.
 
 ### Value types
 
 | Type | Shape | Behaviour |
 |---|---|---|
-| `UserId` | `long` | — (exists because it crosses every port signature and both diagnostics, where a bare `long` is interchangeable with an instrument or order id; quantity crosses no such boundary, which is why there is no `Quantity` type — R-008) |
+| `UserId` | `long` | — (exists because it crosses every layer signature and both diagnostics, where a bare `long` is interchangeable with an instrument or order id; quantity crosses no such boundary, which is why there is no `Quantity` type — R-008) |
 | `InstrumentRef` | `instrumentId`, `ticker`, `name`, `type` | `isCash()` → `type == MONEDA` |
-| `LedgerEntry` | `entryId`, `InstrumentRef`, `OrderSide`, `OrderStatus`, `OrderKind`, `quantity`, `price`, `occurredAt` | `isSettled()`, `reservesCash()`, `reservesShares()`, `cashEffect()`, `signedQuantity()` |
+| `Order` | `orderId`, `InstrumentRef`, `OrderSide`, `OrderStatus`, `OrderKind`, `quantity`, `price`, `occurredAt` | `isSettled()`, `reservesCash()`, `reservesShares()`, `cashEffect()`, `signedQuantity()` |
 | `OrderSide` | enum `BUY`, `SELL`, `CASH_IN`, `CASH_OUT` | `cashSign()`, `positionSign()` |
-| `OrderStatus` | enum `NEW`, `FILLED`, `REJECTED`, `CANCELLED` | `isSettled()`, `isOpen()`, and the static `contributing()` → `{FILLED, NEW}`, which is what the fold asks the port for (R-024) |
+| `OrderStatus` | enum `NEW`, `FILLED`, `REJECTED`, `CANCELLED` | `isSettled()`, `isOpen()`, and the static `contributing()` → `{FILLED, NEW}`, which is what the service asks the repository for (R-024) |
 | `OrderKind` | enum `MARKET`, `LIMIT` | — |
 
-`LedgerEntry` answers the questions the fold asks, so the fold contains no `switch` over sides and
+`Order` answers the questions the fold asks, so the fold contains no `switch` over sides and
 statuses:
 
 | Question | Answer |
@@ -123,15 +134,19 @@ position path.
 ### The fold (FR-016, ADR-0002, R-004)
 
 ```text
-AccountLedger(LedgerEntries entries)
-    snapshotOf(UserId) -> AccountSnapshot
+AccountLedger(List<Order> orders)
+    snapshot() -> AccountSnapshot
 ```
 
-One pass over the user's entries, in `(occurredAt, entryId)` order, accumulating:
+The orders arrive in `(occurredAt, orderId)` order. The snapshot is made of four figures, each
+defined by its rule:
 
-- settled cash — `Σ cashEffect()`
-- reserved cash — `Σ quantity × price` over `reservesCash()`
-- per instrument: a `CostBasisWalk` (quantity + average cost, R-005) and reserved shares
+| Figure | Rule |
+|---|---|
+| settled cash | the sum of every order's `cashEffect()` |
+| reserved cash | the sum of `committedAmount()` over the orders that `reservesCash()` |
+| holdings | per instrument, the weighted-average walk (R-005) over the orders that `movesPosition()`, **in arrival order** — the only figure that depends on order; flat holdings are not listed (FR-025) |
+| reserved shares | per instrument, the sum of `quantity` over the orders that `reservesShares()` |
 
 `AccountSnapshot` is the single value both readers consume:
 
@@ -140,6 +155,7 @@ One pass over the user's entries, in `(occurredAt, entryId)` order, accumulating
 | `settledCash()` | `BigDecimal` | total account value (FR-012) |
 | `availableCash()` | `BigDecimal` = settled − reserved cash | portfolio (FR-011); future `BUY` validation |
 | `holdings()` | `List<Holding>`, non-zero quantities only (FR-025) | positions list |
+| `heldInstrumentIds()` | `List<Long>` | the service, to ask for the closes of what is held |
 | `availableQuantityOf(instrumentId)` | `BigDecimal` = held − reserved shares | future `SELL` validation |
 
 | `Holding` | Returns |
@@ -167,22 +183,23 @@ State: signed `quantity`, `averageCost` per share (scale 10, `HALF_UP`).
 
 The only division is the weighted average, and it happens once per extending order.
 
-### The projection (prices applied)
+### The valuation (prices applied)
 
 ```text
-PortfolioProjection(AccountLedger ledger, LatestPrices prices, PortfolioDiagnostics diagnostics)
-    portfolioOf(UserId) -> Portfolio
+Portfolio.valued(AccountSnapshot snapshot, Closes closes) -> Portfolio
 ```
 
-Per holding, in order:
+Per holding:
 
-1. `isShort()` → `diagnostics.shortPositionDetected(userId, ticker, quantity)` (FR-019).
-2. `prices.closeFor(instrumentId)` absent → `diagnostics.marketDataMissing(userId, ticker)`
-   (FR-022), market value and return absent (FR-020), and the account total is suppressed (FR-021).
-3. market value = `quantity × close`, scaled to 2 `HALF_UP`.
-4. total return = absent when the holding is short (FR-018), when the market value is absent, or
+1. close absent → market value and return absent (FR-020), and the account total is suppressed
+   (FR-021).
+2. market value = `quantity × close`, scaled to 2 `HALF_UP`.
+3. total return = absent when the holding is short (FR-018), when the market value is absent, or
    when `totalCost()` is zero; otherwise `(marketValue − totalCost) / totalCost × 100`, scaled to
    2 `HALF_UP` (R-007).
+
+The two anomalies are returned, not emitted: `shortPositions()` (FR-019) and `unpricedPositions()`
+(FR-022). The service logs each one ([contracts/diagnostics.md](contracts/diagnostics.md)).
 
 Cash never reaches this loop: `isCash()` excluded it during the fold, which is FR-023's ordering
 made structural (R-009).
@@ -193,6 +210,8 @@ made structural (R-009).
 | `availableCash()` | `BigDecimal` (FR-011) |
 | `settledCash()` | `BigDecimal` — carried through from the snapshot so the response is self-reconciling (SC-007, R-016) |
 | `positions()` | `List<Position>`, ticker ascending (R-017) |
+| `shortPositions()` | the positions with a negative quantity (FR-019) |
+| `unpricedPositions()` | the positions with no known close (FR-022) |
 
 | `Position` | Returns |
 |---|---|
@@ -200,19 +219,20 @@ made structural (R-009).
 | `quantity()` | `BigDecimal`, scale 0 |
 | `marketValue()` | `Optional<BigDecimal>`, scale 2 |
 | `totalReturnPercent()` | `Optional<BigDecimal>`, scale 2, percent units |
+| `isShort()` | `quantity < 0` |
+| `isPriced()` | `marketValue` present |
 
-### Ports (domain-declared, adapter-implemented)
+### The service (orchestration)
 
-| Port | Method | Adapter |
-|---|---|---|
-| `LedgerEntries` | `of(UserId, Set<OrderStatus>) -> List<LedgerEntry>`, in `(occurredAt, entryId)` order | `JpaLedgerEntries` |
-| `LatestPrices` | `closeFor(Collection<Long>) -> Map<Long, BigDecimal>` | `JpaLatestPrices` |
-| `Users` | `exists(UserId) -> boolean` | `JpaUsers` |
-| `PortfolioDiagnostics` | `shortPositionDetected(…)`, `marketDataMissing(…)` | `LoggingPortfolioDiagnostics` (R-011) |
+`PortfolioService.portfolioOf(UserId)`, one `REPEATABLE_READ` read-only transaction (R-012):
 
-Four ports, each at a real boundary — persistence (three queries with different shapes and
-different future callers) and observability — as constitution VIII requires. `UnknownUserException`
-is a domain exception thrown when `Users.exists` is false (FR-024, R-014).
+1. `UserMapper.toIdColumn` + `UserRepository.existsById`; otherwise `UnknownUserException` → 404 (FR-024,
+   R-014).
+2. `OrderRepository.findLedgerOf(userId, contributing statuses)` → `OrderMapper` → `AccountLedger` →
+   `snapshot()`.
+3. `MarketDataRepository.findLatestCloses(snapshot.heldInstrumentIds())` → `MarketDataMapper` →
+   `Portfolio.valued(snapshot, closes)`.
+4. Log `shortPositions()` at `ERROR` and `unpricedPositions()` at `WARN`; return the portfolio.
 
 ## State transitions
 
@@ -224,9 +244,9 @@ and the locking of constitution IV.
 
 | Spec entity | Where it lives |
 |---|---|
-| User | `UserId`, `Users` port, `UserEntity` |
-| Order (ledger entry) | `LedgerEntry`, `OrderEntity` |
+| User | `UserId`, `UserRepository`, `UserEntity` |
+| Order | `Order`, `OrderEntity` |
 | Instrument | `InstrumentRef`, `InstrumentEntity` |
-| Market data | `LatestPrices` port, `MarketDataEntity` — only the latest `close` |
-| Position (derived) | `Holding` in the fold, `Position` in the projection |
+| Market data | `MarketDataRepository`, `MarketDataEntity` — only the latest `close` |
+| Position (derived) | `Holding` in the fold, `Position` in the valuation |
 | Portfolio (derived) | `Portfolio` |
