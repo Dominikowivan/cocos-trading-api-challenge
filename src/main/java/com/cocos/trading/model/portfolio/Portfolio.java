@@ -9,39 +9,19 @@ import com.cocos.trading.model.DecimalPolicy;
 import com.cocos.trading.model.ledger.AccountSnapshot;
 import com.cocos.trading.model.ledger.Holding;
 
-public final class Portfolio {
+public record Portfolio(BigDecimal settledCash, BigDecimal availableCash, List<Position> positions) {
 
 	private static final Comparator<Position> BY_TICKER = Comparator
 		.comparing(position -> position.instrument().ticker());
 
-	private final BigDecimal settledCash;
-
-	private final BigDecimal availableCash;
-
-	private final List<Position> positions;
-
-	public Portfolio(BigDecimal settledCash, BigDecimal availableCash, List<Position> positions) {
-		this.settledCash = settledCash;
-		this.availableCash = availableCash;
-		this.positions = positions.stream().sorted(BY_TICKER).toList();
+	public Portfolio {
+		positions = positions.stream().sorted(BY_TICKER).toList();
 	}
 
 	public static Portfolio valued(AccountSnapshot snapshot, Closes closes) {
 		List<Position> positions = snapshot.holdings().stream().map(holding -> positionOf(holding, closes)).toList();
 
 		return new Portfolio(snapshot.settledCash(), snapshot.availableCash(), positions);
-	}
-
-	public BigDecimal settledCash() {
-		return settledCash;
-	}
-
-	public BigDecimal availableCash() {
-		return availableCash;
-	}
-
-	public List<Position> positions() {
-		return positions;
 	}
 
 	public List<Position> shortPositions() {

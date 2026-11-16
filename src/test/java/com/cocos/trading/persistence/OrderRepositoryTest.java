@@ -32,9 +32,8 @@ class OrderRepositoryTest extends PersistenceTestBase {
 	void cancelled_and_rejected_rows_are_never_returned() {
 		List<Order> orders = ordersOf(SEEDED);
 
-		assertThat(orders).isNotEmpty();
-		assertThat(orders).allSatisfy(order -> assertThat(order.status()).isIn(OrderStatus.FILLED, OrderStatus.NEW));
-		assertThat(orders).hasSize(9);
+		assertThat(orders).hasSize(9)
+			.allSatisfy(order -> assertThat(order.status()).isIn(OrderStatus.FILLED, OrderStatus.NEW));
 	}
 
 	@Test
@@ -51,7 +50,7 @@ class OrderRepositoryTest extends PersistenceTestBase {
 
 		List<Order> orders = ordersOf(SEEDED);
 
-		assertThat(orders).allSatisfy(order -> assertThat(order.instrument().ticker()).isNotBlank());
+		assertThat(orders).isNotEmpty().allSatisfy(order -> assertThat(order.instrument().ticker()).isNotBlank());
 		assertThat(statistics.getPrepareStatementCount()).isEqualTo(1);
 	}
 

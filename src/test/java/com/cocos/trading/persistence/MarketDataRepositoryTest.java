@@ -55,8 +55,7 @@ class MarketDataRepositoryTest extends PersistenceTestBase {
 
 		Map<Long, BigDecimal> closes = latestClosesOf(every);
 
-		assertThat(closes).hasSize(63);
-		assertThat(closes).doesNotContainKeys(PGR, IRCP, ARS);
+		assertThat(closes).hasSize(63).doesNotContainKeys(PGR, IRCP, ARS);
 	}
 
 	@Test
