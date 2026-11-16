@@ -27,3 +27,4 @@ currently holds; the journal is the authority on how it was reached.**
 | [0015](0015-the-account-snapshot-is-the-folds-contract.md) | The fold returns one account snapshot | Accepted |
 | [0016](0016-decimal-scale-and-rounding-policy.md) | One decimal scale and rounding policy | Accepted |
 | [0017](0017-layers-with-a-service-that-orchestrates.md) | Layers, with a service that orchestrates and a pure model | Accepted |
+| [0018](0018-architecture-rules-as-archunit-tests.md) | The layering rules are enforced by ArchUnit tests | Accepted |
