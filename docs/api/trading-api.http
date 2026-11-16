@@ -32,13 +32,16 @@ GET {{host}}/api/v1/users/2/portfolio
 Accept: application/json
 
 ### Portfolio — an id that is not a user
-# 404 application/problem+json. Distinguishable from the request above: a wrong id is never
-# served as a real account that has never traded (FR-024).
+# 404 application/problem+json, title "Not Found", detail "User 999 does not exist".
+# Distinguishable from the request above: a wrong id is never served as a real account that has
+# never traded (FR-024).
 GET {{host}}/api/v1/users/999/portfolio
 Accept: application/json
 
 ### Portfolio — a malformed id
-# 400 application/problem+json. The id is bound as a long, so this never reaches the domain.
+# 400 application/problem+json, title "Bad Request", detail
+# "Failed to convert 'userId' with value: 'abc'". The id is bound as a long, so this never
+# reaches the domain.
 GET {{host}}/api/v1/users/abc/portfolio
 Accept: application/json
 

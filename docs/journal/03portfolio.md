@@ -1,94 +1,117 @@
 # Portfolio
 
-Bien vamos a arrancar con el primer endpoint del proyecto.
+Bien, vamos a arrancar con el primer endpoint del proyecto.
 
-"Portfolio: La respuesta deberá devolver el valor total de la cuenta de un usuario, sus pesos disponibles para operar y el listado de activos que posee (incluyendo cantidad de acciones, el valor total monetario de la posición ($) y el rendimiento total (%))."
+> "Portfolio: La respuesta deberá devolver el valor total de la cuenta de un usuario, sus pesos disponibles para operar y el listado de activos que posee (incluyendo cantidad de acciones, el valor total monetario de la posición ($) y el rendimiento total (%))."
 
-Repaso las cosas que ya anote:
+Repaso las cosas que ya anoté:
 
 Según los requerimientos funcionales, siempre se usan las órdenes en estado "FILLED" para calcular los atributos de los activos.
 
-- Valor total de la cuenta del usuario:
-- Pesos disponibles para operar:
-  - Listados de activos, donde un activo tiene:
-    - cantidad de acciones: sum de todas las órdenes filled de ese usuario para un instrumento dado.
-    - valor total monetario de la posición: cantidad de acciones x último closed  del instrumento dado.
-    - rendimiento total: Si el usuario está en rendimiento positivo o negativo frente a sus inversiones. Vamos a usar la estrategia de weighted average.
+- Valor total de la cuenta del usuario.
+- Pesos disponibles para operar.
+- Listado de activos, donde un activo tiene:
+  - cantidad de acciones: suma de todas las órdenes FILLED de ese usuario para un instrumento dado.
+  - valor total monetario de la posición: cantidad de acciones x último close del instrumento dado.
+  - rendimiento total: si el usuario está en rendimiento positivo o negativo frente a sus inversiones. Vamos a usar la estrategia de weighted average.
 
-
-Agrego el challenge.md a documentos por que es la fuente de verdad de los requerimientos del proyecto y va a servir a la hora de trabajar con SDD.
+Agrego el challenge.md a documentos porque es la fuente de verdad de los requerimientos del proyecto y va a servir a la hora de trabajar con SDD.
 
 Arranco con el specify.
 
-Primera clarificacion:
-"
-Question 1: Negative position
+## Clarificaciones
 
-Context: Edge Cases — "the dataset leaves user 1 holding BMA -10 (more sold than bought)."
-What we need to know: Is a negative position reported as-is, filtered out, or flagged — and what is its total return?"
-"
+### Primera clarificación
 
-Es el caso de anomalia de BMA que termina dando -10 de posicion total para le usuario.
+> **Question 1: Negative position**
+>
+> Context: Edge Cases — "the dataset leaves user 1 holding BMA -10 (more sold than bought)."
+>
+> What we need to know: Is a negative position reported as-is, filtered out, or flagged — and what is its total return?
 
-Vamos a reportar "as-is" para no romper la app, por que es un error ya concretado, y pienso que es mejor ser transparente con el usuario
+Es el caso de anomalía de BMA que termina dando -10 de posición total para el usuario.
 
-En la api, ahora mismo por como funciona, uno de los requerimientos funcionales es que un usuario no pueda estar en short.
-Estamos decidiendo que hacer si se da el caso que la base reporta que un usuario tiene una posicion en short de todas formas.
+Vamos a reportar "as-is" para no romper la app, porque es un error ya concretado, y pienso que es mejor ser transparente con el usuario.
 
-Si es una regla de negocio rota, lo mejor es hacer ruido, que el equipo tecnico sepa que algo salio mal.
-Vamos a fallar con un log a nivel de error con el id de usuario, instrumento y cantidad. 
+En la API, ahora mismo, por cómo funciona, uno de los requerimientos funcionales es que un usuario no pueda estar en short.
+Estamos decidiendo qué hacer si se da el caso de que la base reporta que un usuario tiene una posición en short de todas formas.
 
-""
-Question 2: Held instrument with no market data
+Si es una regla de negocio rota, lo mejor es hacer ruido, que el equipo técnico sepa que algo salió mal.
+Vamos a fallar con un log a nivel de error con el id de usuario, instrumento y cantidad.
 
-Context: User Story 2, scenario 3 — PGR and IRCP are held but have no marketdata row.
+### Segunda clarificación
 
-What we need to know: What market value and total return does such a position report?
-"
+> **Question 2: Held instrument with no market data**
+>
+> Context: User Story 2, scenario 3 — PGR and IRCP are held but have no marketdata row.
+>
+> What we need to know: What market value and total return does such a position report?
 
-Aca la diferencia con el caso anterior es que no es una regla rota para la api.
-Puede pasar que es un instrumento que el usuario tiene, pero que aun no cotizo.
-Logueamos warning para no continuar silenciosamente. Al usuario Le mostramos lo que sabemos: Cual es su posicion, pero marketData: null.
-Null siempre en vez de valores "0", por que 0 indica una cantidad valida que no es real.
-El valor total de la cuenta tambien quedaria en null, por que si decimos cualquier otro numero mentimos.
+Acá la diferencia con el caso anterior es que no es una regla rota para la API.
+Puede pasar que es un instrumento que el usuario tiene, pero que aún no cotizó.
+Logueamos warning para no continuar silenciosamente. Al usuario le mostramos lo que sabemos: cuál es su posición, pero marketData: null.
+Null siempre en vez de valores "0", porque 0 indica una cantidad válida que no es real.
+El valor total de la cuenta también quedaría en null, porque si decimos cualquier otro número mentimos.
 
-La unica excepcion serian los instrumentos de tipo "Moneda" por que cada unidad tiene valor por si misma.
+La única excepción serían los instrumentos de tipo "Moneda", porque cada unidad tiene valor por sí misma.
 
-Lo que si cabe aclarar: en los seeds no veo que este caso suceda, es un caso defensivo.
+Lo que sí cabe aclarar: en los seeds no veo que este caso suceda, es un caso defensivo.
 
-"Question 3: Unknown user id
+### Tercera clarificación
 
-Context: Edge Cases — the id is untrusted input (ADR-0007).
+> **Question 3: Unknown user id**
+>
+> Context: Edge Cases — the id is untrusted input (ADR-0007).
+>
+> What we need to know: Is a request for a non-existent user id rejected as not found, or answered with an empty portfolio?
 
-What we need to know: Is a request for a non-existent user id rejected as not found, or answered with an empty portfolio?
+404 Not Found. Por defecto para cualquier búsqueda por id no encontrada.
 
-*""
-
-404 not found. Por defecto para cualquier busqueda por id no encontrada.
+## Plan
 
 Listo, vamos al plan y revisarlo.
 
-# Summary: 
+Me propuso hacer 3 queries:
 
-Me propuso hacer 3 queries.
-1- Existencia del usuario: OK. Es una validacion clasica.
-2- Traerse todas las ordenes, en cualquier estado, como entidades JPA completas (eeeeh, es necesario?)
-Por cada orden, en base a su estado y lado decide que hacer. (Me parece OK que esto recida en la app, logica de negocio)
-3- Trae el ultimo precio de las acciones para armar la info de los activos.
+1. Existencia del usuario: OK. Es una validación clásica.
+2. Traerse todas las órdenes, en cualquier estado, como entidades JPA completas (eeeeh, ¿es necesario?).
+   Por cada orden, en base a su estado y lado, decide qué hacer. (Me parece OK que esto resida en la app: lógica de negocio.)
+3. Trae el último precio de las acciones para armar la info de los activos.
 
-Lo que me parece bien: 
-Reglas de negocio en java, la existencia de usuario para decidir si cortar ahi o no.
-Repeatable_read en el transaction. Como hacemos multiples reads, es mejor hacerlos sobre un snapshot. De otra forma puede quedar inconsistente.
+Lo que me parece bien:
+
+- Reglas de negocio en Java, la existencia de usuario para decidir si cortar ahí o no.
+- REPEATABLE_READ en la transacción. Como hacemos múltiples reads, es mejor hacerlos sobre un snapshot. De otra forma puede quedar inconsistente.
 
 Lo que no me parece bien:
--Traer ordenes que no usa, las canceled y rejected no aportan nada. 
 
-Lo que queda a revisar una vez genere el codigo:
-Las ordenes que trae, las pasa a java. Van a encapsular logica de negocio o van a ser solo datos de lectura? por que armar objetos java, solo para leerlos y que no tengan logica
-es estado manejado sin sentido. Con records bastaria si es ese caso. 
+- Traer órdenes que no usa: las CANCELLED y REJECTED no aportan nada.
 
-Corregi el plan con la observacion de las ordenes que no tiene sentido traerse y lo acepto.
+Lo que queda a revisar una vez que genere el código:
+Las órdenes que trae, las pasa a Java. ¿Van a encapsular lógica de negocio o van a ser solo datos de lectura? Porque armar objetos Java solo para leerlos, y que no tengan lógica, es estado manejado sin sentido. Con records bastaría si es ese caso.
 
-El resto en el plan queda muy en abstracto, prefiero revisar el codigo y hacer correcciones una vez generado (siempre antes de commitear).
+Corregí el plan con la observación de las órdenes que no tiene sentido traerse, y lo acepto.
+
+El resto en el plan queda muy en abstracto; prefiero revisar el código y hacer correcciones una vez generado (siempre antes de commitear).
 
 Corro tasks, implement, y vamos a ver.
+
+## Revisión del código
+
+Ya estuve revisando el código. Primeras impresiones: bien, pero hay algunas cosas a refactorizar con las que estoy en desacuerdo.
+
+1. La orden se desglosa en el modelo a "Ledger". O sea, ordenRepository devuelve LedgerEntry para cada orden.
+   En todos lados del challenge se le dice orden, en la base de datos se le dice orden, y no pensamos en algún momento cercano refactorizar esa tabla, así que, para facilidad de comprensión, es mejor renombrarlo a Orden y operar con eso.
+
+2. Después, veo mucho código que podría dividirse un poco en subtareas para mejor comprensión y lectura.
+   Acá falta alguna regla en la constitución que lo haga respetar.
+
+   En la clase "AccountLedger", para calcular el settledCash y el reservedCash, inicia un contador y va recorriendo las órdenes para ir sumando a ese contador. Se podría solucionar con un fold, o un map + sum.
+
+   Agregué un task template para que en cada task se ejecute un paso de refactor aplicando los principios de la constitución al finalizarlos.
+
+3. Después, organización de código. Dividió en dos carpetas: ledger y portfolio.
+
+   La carpeta de modelo también quedó muy bolsa de gatos, todo dentro de dos carpetas distintas. La reorganicé para juntar dentro de una misma carpeta lo que es cohesivo entre sí.
+
+Finalmente, como retrospectiva, quedo grande el feature con SDD. Creo que el endpoint de busqueda hubiera sido mas chico y mejor para empezar, asi se encaraba este de portfolio con una estructura ya armada sobre la cual basarse.

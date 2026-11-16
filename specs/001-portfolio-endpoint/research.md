@@ -24,6 +24,15 @@ feature rather than decisions the rest of the codebase has to live with: a seam 
 and a media type the framework already produces. This file is their record; if either is ever
 reversed, the reversal is what deserves an ADR.
 
+**Amended 2026-11-15, after the first implementation.** The author rejected the ports-and-adapters
+shape this research assumed: model objects fetched their own data through ports, and the flow of a
+request could not be followed. Constitution 2.0.0 and
+[ADR-0017](../../docs/adr/0017-layers-with-a-service-that-orchestrates.md) replace it with layers —
+the service orchestrates repositories, mappers and a pure model. R-011 is reversed by that ADR; R-004,
+R-012, R-014 and R-024 keep their decisions with the mechanics restated. Each carries a note. The
+entries are otherwise left as written, because they are the record of how the decisions were
+reached.
+
 ## Measured facts this phase relied on
 
 Measured on `src/main/resources/db/seed/V1000__given_dataset.sql` on 2026-11-15, not estimated:
@@ -165,6 +174,11 @@ of instruments actually held.
 **ADR candidate — ADR-0015.** ADR-0002 decided *that* one service owns the fold; it did not decide
 what that service hands back, and FR-016's "the two cannot disagree" is a property of the shape,
 not of the file layout.
+
+> **Amended (ADR-0017):** `AccountLedger` is now a model object built from the entries the service
+> read — `new AccountLedger(orders).snapshot()` — not a service holding a port. The contract below
+> is unchanged. The "single pass" was later replaced by one small method per figure, for
+> readability; see ADR-0015's consequences.
 
 **Decision**: a domain service `AccountLedger` with one entry point, `snapshotOf(userId)`, whose
 return value `AccountSnapshot` is computed in a **single pass** over the user's orders and carries
@@ -374,6 +388,15 @@ shape never changes between users.
 
 ### R-011: Diagnostics are a domain port, not a logger call
 
+> **Reversed 2026-11-15 by [ADR-0017](../../docs/adr/0017-layers-with-a-service-that-orchestrates.md).**
+> The model now returns the anomalies (`Portfolio.shortPositions()`, `unpricedPositions()`) and
+> `PortfolioService` logs them; the port, its logging adapter and the recording fake are gone. This
+> is close to the second alternative below, with the two objections to it answered: the logging
+> happens in the service, not in the web layer, so it fires once per valuation whoever calls the
+> service; and the anomalies live on the model `Portfolio`, while the HTTP response is a separate
+> DTO that never carries them. SC-009's "exactly one" is still asserted in a plain unit test, now
+> on the returned list.
+
 FR-019 and FR-022 make two log records functional requirements with acceptance criteria (SC-009
 asserts *exactly one* error entry for user `1`). A requirement that is asserted needs a seam; which
 seam is a decision with alternatives, recorded here. **No ADR**: it is a testing seam inside one
@@ -408,6 +431,11 @@ assertable in a millisecond-fast unit test.
   [Q-002](#q-002-a-micrometer-counter-alongside-each-diagnostic).
 
 ### R-012: The read-only transaction boundary sits in a thin application service
+
+> **Amended (ADR-0017):** the boundary is still one `REPEATABLE_READ` read-only transaction, now on
+> `service/PortfolioService`, which is no longer thin: it orchestrates the three reads, the mapping
+> and the model. The `@Configuration` wiring of model objects is gone, because the model is not a
+> bean. The isolation reasoning below is unchanged.
 
 **Decision**: a single Spring-managed class in `application`, annotated
 
@@ -500,6 +528,9 @@ will go without inventing a second error envelope.
   malformed is a support ticket.
 
 ### R-014: User existence is checked explicitly
+
+> **Amended (ADR-0017):** the service asks `UserRepository.existsById`, after `UserMapper` narrows the id
+> to the `INT` column (an id out of range cannot exist). Same decision, no port.
 
 **Decision**: the use case asks a `Users` port `exists(userId)` and throws `UnknownUserException`
 before folding anything. FR-024 (404) versus FR-014 (empty portfolio) is otherwise undecidable:
@@ -594,6 +625,13 @@ the list, and independent of values that may be absent.
 - **Unspecified / whatever the map iteration yields.** Rejected: it breaks SC-006.
 
 ### R-018: Indexes arrive as a new Flyway migration
+
+> **Amended 2026-11-15:** `idx_orders_userid_instrumentid` was dropped from `V2` before it was
+> committed or applied anywhere. The portfolio's only `orders` query filters by `(userid, status)`
+> and never reads it. ADR-0002 names it as a mitigation; it arrives with the first feature that has
+> a query filtering by user and instrument, if one does (constitution IX: a structure chosen for
+> performance cites a real use). Order validation reads the same snapshot through
+> `(userid, status)`, so it is not obviously that feature.
 
 **Decision**: `V2__portfolio_read_indexes.sql`:
 
@@ -736,6 +774,11 @@ read the expected figures there and fire the requests from here.
 
 ### R-024: The ledger query fetches only the statuses the fold uses
 
+> **Amended (ADR-0017):** the set still comes from the model (`OrderStatus.contributing()`), but it
+> is the service that passes it to `OrderRepository.findLedgerOf`, through `OrderMapper.toStatusColumns`.
+> The fold no longer asks for anything: it folds what it is given. Persistence still binds a
+> parameter and decides nothing.
+
 **Decision**: the ledger query carries `and o.status in :statuses`, and the set comes **from the
 domain** — `OrderStatus.contributing()` returns `{FILLED, NEW}`, `AccountLedger` passes it to the
 port, the adapter binds it as a parameter. `CANCELLED` and `REJECTED` rows are never read and never
@@ -751,7 +794,7 @@ user's whole history (ADR-0002) rather than with their positions.
 
 Passing the set from the domain is what makes this clean rather than a leak. The question *"which
 statuses matter"* is answered once, in `OrderStatus`, and SQL receives the answer as a parameter;
-the question *"what does each status mean"* — settled, reserving, ignored — stays in `LedgerEntry`.
+the question *"what does each status mean"* — settled, reserving, ignored — stays in `Order`.
 Constitution III is satisfied on its own terms: the adapter selects rows, it does not decide rules.
 
 **This entry corrects an inconsistency in the first draft of the plan**, which fetched every status
@@ -766,7 +809,7 @@ that costs data was the wrong one to keep. Raised by the author on review.
   merit: the port has a single-argument signature and the fold is the only place a status appears.
 - **Hard-code `where o.status in ('FILLED', 'NEW')` in the adapter.** The shortest form, and the
   one that earns the original objection: the set of statuses that matter would then exist in two
-  places — the JPQL string and `LedgerEntry`'s predicates — and a future status would be added to
+  places — the JPQL string and `Order`'s predicates — and a future status would be added to
   one of them. Rejected for that, not for SQL hygiene.
 - **Two queries, one per status** (`FILLED` rows for the fold, `NEW` rows for the reservations).
   Rejected: two round trips for one pass, and the walk needs the settled rows in order anyway.
@@ -782,6 +825,12 @@ read on every portfolio request.
 
 Two decisions are **not taken here**, deliberately. Both are additions that would be reasonable and
 neither blocks implementation; each changes what ships, so the call is the author's.
+
+**Answered on 2026-11-15, at implementation time: both deferred.** Neither ships with feature
+`001-portfolio-endpoint`. The hand-written contract in `contracts/` stays the reference for the
+response shape, and the two diagnostics stay log-only. Both remain cheap to add later — Q-002
+especially, because the model already names the two anomalies — and neither is rejected
+on its merits. The arguments on both sides are kept below as they were put.
 
 ### Q-001: `springdoc-openapi` in the running application
 
@@ -802,7 +851,7 @@ client.
 
 ### Q-002: A Micrometer counter alongside each diagnostic
 
-The logging adapter could also increment a counter —
+The service could also increment a counter next to each log call —
 `portfolio.anomaly{kind="short_position"}` and `portfolio.anomaly{kind="missing_market_data"}`.
 
 - **For**: an alert on "short positions served per hour" is a threshold on a counter, not a log
@@ -812,8 +861,9 @@ The logging adapter could also increment a counter —
   counter answers *how often*, the log answers *to whom*.
 - **Against**: it adds `spring-boot-starter-actuator` and a second output for one event, with no
   collector in this project to scrape it, so nothing would read it during the exercise.
-- **Cost if deferred**: low. The port already names the two events, so the counter is two lines in
-  the existing adapter whenever a metrics stack exists.
+- **Cost if deferred**: low. `Portfolio.shortPositions()` and `unpricedPositions()` already name
+  the two anomalies, so the counter is two lines in `PortfolioService` whenever a metrics stack
+  exists.
 
 ### Resolved, not open
 

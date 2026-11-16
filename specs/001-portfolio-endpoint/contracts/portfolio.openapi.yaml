@@ -99,7 +99,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/Problem"
               example:
-                type: about:blank
                 title: Bad Request
                 status: 400
                 detail: "Failed to convert 'userId' with value: 'abc'"
@@ -111,7 +110,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/Problem"
               example:
-                type: about:blank
                 title: Not Found
                 status: 404
                 detail: User 999 does not exist
@@ -210,8 +208,12 @@ components:
 
     Problem:
       type: object
-      description: RFC 9457 problem detail (research R-013).
-      required: [type, title, status]
+      description: |
+        RFC 9457 problem detail (research R-013). `type` is **absent** on every problem this API
+        currently produces, which RFC 9457 §3.1 defines as `about:blank` — the responses carry no
+        problem type of their own yet. A client reads an absent `type` as `about:blank`; it is
+        declared here rather than required so the document describes what ships.
+      required: [title, status]
       properties:
         type:
           type: string
