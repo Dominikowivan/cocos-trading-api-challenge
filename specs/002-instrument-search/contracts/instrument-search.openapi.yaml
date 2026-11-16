@@ -1,0 +1,417 @@
+openapi: 3.1.0
+
+info:
+  title: Cocos Trading API — instrument search (design-time proposal)
+  version: 1.0.0
+  description: |
+    The contract proposed by feature `002-instrument-search` at plan time. It is **not** the live
+    contract: `docs/api/openapi.yaml` is, and this operation and these schemas are merged into it
+    as part of the implementation (ADR-0024, research R-114). This file is kept as the design was
+    proposed and is not edited afterwards (constitution, Technology and Scope Constraints).
+
+    Requirement ids below (`FR-`, `SC-`, research `R-`) refer to `specs/002-instrument-search/`.
+
+    Three rules shape this contract and are not negotiable per field:
+
+    - **An unknown money figure is `null`, never `0`** (ADR-0013). The keys are always present.
+    - **Nothing matched is a `200` with an empty page**, which is a different answer from the
+      `400` of a blank query (FR-011, SC-010). So is a page past the last one.
+    - **A bad paging request is rejected, never silently adjusted** (FR-015a): a caller is never
+      served a page they did not ask for.
+
+servers:
+  - url: http://localhost:8080
+    description: Local development (docker compose database on port 5433)
+
+paths:
+  /api/v1/instruments/search:
+    get:
+      summary: Search the market's instruments by ticker or name
+      description: |
+        Returns one page of the instruments whose ticker or name contains the query, best matches
+        first (FR-001). Matching is partial, case-insensitive and accent-insensitive (FR-003 to
+        FR-005), and literal: `%`, `_`, quotes and backslashes are ordinary characters (FR-010),
+        and a typo matches nothing (FR-024).
+
+        Read-only. It reads `instruments` and `marketdata` only, never the `orders` ledger, and
+        takes no user id — there is no authentication, so every caller gets the same answer
+        (FR-021, ADR-0007).
+
+        Instruments of type `MONEDA` are never returned: pesos are cash, not a tradable asset, so
+        `ars` and `pesos` both come back empty (FR-023).
+
+        The order is total and stable — relevance tier, then ticker ascending — so the same query
+        over unchanged data always returns the same page in the same order, and consecutive pages
+        together return every match exactly once (FR-013, FR-014, FR-015b, SC-007).
+      operationId: searchInstruments
+      parameters:
+        - name: query
+          in: query
+          required: true
+          description: |
+            The free text to search for. Trimmed of leading and trailing whitespace before
+            matching (FR-007); the trimmed form is echoed back in the response. Must not be empty
+            or whitespace-only (FR-008), and must be at most `trading.search.max-query-length`
+            characters after trimming (FR-009) — **64** unless the deployment configures
+            otherwise. The longest instrument name in the market is 42, so a query between 43 and
+            64 characters is accepted and simply matches nothing.
+          schema:
+            type: string
+            minLength: 1
+          example: pamp
+        - name: page
+          in: query
+          required: false
+          description: |
+            Zero-based page number (FR-015). A page past the last one is an empty page carrying
+            the real total, not an error (FR-015b). A negative page is rejected (FR-015a).
+          schema:
+            type: integer
+            format: int32
+            minimum: 0
+            default: 0
+          example: 0
+        - name: size
+          in: query
+          required: false
+          description: |
+            How many results this page holds, so a client that wants more than the default can
+            ask for it in one request (FR-015a). Must be at least 1 and at most
+            `trading.search.max-page-size` — **100** unless the deployment configures otherwise.
+            A request above the maximum is **rejected, not clamped**.
+
+            When absent, the deployment's `trading.search.default-page-size` applies — **20**
+            unless configured otherwise (FR-015c). Both limits are settable per deployment
+            through environment variables, so neither is stated here as a fixed `maximum`: the
+            value in force is always the one echoed in the response or named in the rejection.
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+          example: 20
+      responses:
+        "200":
+          description: |
+            One page of matching instruments, possibly empty. A query that matches nothing, and a
+            page past the last one, are both successes with an empty list, not a 404 (FR-011,
+            FR-015b).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstrumentSearch"
+              examples:
+                exactTicker:
+                  summary: "`pamp` — an exact ticker match (SC-001, story 4.1)"
+                  value:
+                    query: pamp
+                    page: 0
+                    size: 20
+                    totalElements: 1
+                    totalPages: 1
+                    results:
+                      - instrumentId: 47
+                        ticker: PAMP
+                        name: Pampa Holding S.A.
+                        type: ACCIONES
+                        close: 925.85
+                        dailyReturnPercent: 0.44
+                nameFamily:
+                  summary: "`banco` — one fragment returns the family (SC-002)"
+                  description: |
+                    All four are name-prefix matches, so the tier does not separate them and the
+                    ticker does. This is what the statement's "activos similares" means here
+                    (FR-024).
+                  value:
+                    query: banco
+                    page: 0
+                    size: 20
+                    totalElements: 4
+                    totalPages: 1
+                    results:
+                      - instrumentId: 22
+                        ticker: BBAR
+                        name: Banco Frances
+                        type: ACCIONES
+                        close: 1038.10
+                        dailyReturnPercent: -0.87
+                      - instrumentId: 28
+                        ticker: BHIP
+                        name: Banco Hipotecario S.A.
+                        type: ACCIONES
+                        close: 33.40
+                        dailyReturnPercent: -3.47
+                      - instrumentId: 31
+                        ticker: BMA
+                        name: Banco Macro S.A.
+                        type: ACCIONES
+                        close: 1502.80
+                        dailyReturnPercent: -1.15
+                      - instrumentId: 19
+                        ticker: BPAT
+                        name: Banco Patagonia
+                        type: ACCIONES
+                        close: 279.00
+                        dailyReturnPercent: -3.46
+                accentFolded:
+                  summary: "`compania` — found without the diacritic (SC-003)"
+                  description: A plain substring match returns nothing here (FR-005).
+                  value:
+                    query: compania
+                    page: 0
+                    size: 20
+                    totalElements: 1
+                    totalPages: 1
+                    results:
+                      - instrumentId: 13
+                        ticker: INTR
+                        name: Compañía Introductora de Buenos Aires S.A.
+                        type: ACCIONES
+                        close: 77.00
+                        dailyReturnPercent: 2.67
+                unpriced:
+                  summary: "`pgr` — an instrument with no market data (SC-009, FR-018)"
+                  description: |
+                    Both figures are `null`, never `0`: the price is unknown, not zero
+                    (ADR-0013). The instrument is still returned, with everything that identifies
+                    it — the lateral join is a `LEFT` join for exactly this reason.
+                  value:
+                    query: pgr
+                    page: 0
+                    size: 20
+                    totalElements: 1
+                    totalPages: 1
+                    results:
+                      - instrumentId: 3
+                        ticker: PGR
+                        name: Phoenix Global Resources
+                        type: ACCIONES
+                        close: null
+                        dailyReturnPercent: null
+                noMatch:
+                  summary: "`ZZZZ` — nothing matched (FR-011, SC-010)"
+                  value:
+                    query: ZZZZ
+                    page: 0
+                    size: 20
+                    totalElements: 0
+                    totalPages: 0
+                    results: []
+                pagedBroadQuery:
+                  summary: "`a` — 59 match, the first 20 are returned (SC-005)"
+                  description: |
+                    `totalElements` says exactly how much the caller has not seen, which is what
+                    a truncation flag could only hint at. The three results shown are the first
+                    three of the twenty: `AGRO`, `ALUA` and `AUSO` are the only ticker-prefix
+                    matches, and the rest of the page is contained matches in ticker order.
+                  value:
+                    query: a
+                    page: 0
+                    size: 20
+                    totalElements: 59
+                    totalPages: 3
+                    results:
+                      - instrumentId: 26
+                        ticker: AGRO
+                        name: Agrometal
+                        type: ACCIONES
+                        close: 138.00
+                        dailyReturnPercent: 0.00
+                      - instrumentId: 61
+                        ticker: ALUA
+                        name: Aluar Aluminio Argentino S.A.I.C.
+                        type: ACCIONES
+                        close: 410.00
+                        dailyReturnPercent: -0.49
+                      - instrumentId: 27
+                        ticker: AUSO
+                        name: Autopistas del Sol
+                        type: ACCIONES
+                        close: 624.00
+                        dailyReturnPercent: 0.16
+                pastTheEnd:
+                  summary: "`a` page 9 — past the last page (FR-015b, story 3.7)"
+                  description: |
+                    An empty page carrying the real total, not an error and not the last page.
+                    The caller can tell it overshot by comparing `page` with `totalPages`.
+                  value:
+                    query: a
+                    page: 9
+                    size: 20
+                    totalElements: 59
+                    totalPages: 3
+                    results: []
+        "400":
+          description: |
+            The request cannot be served: the query is missing, empty, whitespace-only (FR-008) or
+            over the maximum length (FR-009); or the paging is out of bounds (FR-015a).
+            Distinguishable from the empty page above: there, the search ran; here, it never ran
+            (SC-010).
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+              examples:
+                blank:
+                  summary: Whitespace-only query
+                  value:
+                    title: Bad Request
+                    status: 400
+                    detail: The search query must not be blank
+                    instance: /api/v1/instruments/search
+                missing:
+                  summary: No query parameter at all
+                  value:
+                    title: Bad Request
+                    status: 400
+                    detail: "Required request parameter 'query' is not present"
+                    instance: /api/v1/instruments/search
+                queryTooLong:
+                  summary: Query over the configured maximum
+                  description: The rejection names the limit in force, which is how a configured value stays observable (FR-015c).
+                  value:
+                    title: Bad Request
+                    status: 400
+                    detail: The search query must be at most 64 characters
+                    instance: /api/v1/instruments/search
+                sizeTooLarge:
+                  summary: A page size above the configured maximum
+                  description: Rejected, never clamped — the caller is told, not quietly served something else (FR-015a).
+                  value:
+                    title: Bad Request
+                    status: 400
+                    detail: The page size must be between 1 and 100
+                    instance: /api/v1/instruments/search
+                negativePage:
+                  summary: A negative page number
+                  value:
+                    title: Bad Request
+                    status: 400
+                    detail: The page number must not be negative
+                    instance: /api/v1/instruments/search
+
+components:
+  schemas:
+    InstrumentSearch:
+      type: object
+      required: [query, page, size, totalElements, totalPages, results]
+      additionalProperties: false
+      properties:
+        query:
+          type: string
+          description: |
+            The query as it was searched: the request's parameter, trimmed (FR-007). A caller that
+            sent `"  pamp  "` reads `pamp` here.
+          example: pamp
+        page:
+          type: integer
+          format: int32
+          minimum: 0
+          description: The zero-based page this response holds — the one that was asked for.
+          example: 0
+        size:
+          type: integer
+          format: int32
+          minimum: 1
+          description: |
+            The page size in force: what the caller asked for, or the deployment's configured
+            default when they asked for nothing. Echoing it is how the configured default stays
+            observable without a settings endpoint (FR-015c).
+          example: 20
+        totalElements:
+          type: integer
+          format: int64
+          minimum: 0
+          description: |
+            How many instruments matched the query in total, across every page (FR-015). This is
+            what tells a caller how much they have not seen, and it is computed under the same
+            snapshot as `results`, so the two never contradict each other (research R-112).
+          example: 59
+        totalPages:
+          type: integer
+          format: int32
+          minimum: 0
+          description: |
+            How many pages of the current `size` the matches fill; `0` when nothing matched. A
+            `page` at or above this value is a valid request that returns an empty list.
+          example: 3
+        results:
+          type: array
+          description: |
+            This page of matches, strongest first: exact ticker, then ticker starting with the
+            query, then name starting with the query, then any other match on ticker or name;
+            within a tier, ticker ascending (FR-013, FR-014). Empty when nothing matched, and when
+            the page is past the last one (FR-011, FR-015b). An instrument matching on both its
+            ticker and its name appears once (FR-006).
+          items:
+            $ref: "#/components/schemas/InstrumentMatch"
+
+    InstrumentMatch:
+      type: object
+      required: [instrumentId, ticker, name, type, close, dailyReturnPercent]
+      additionalProperties: false
+      properties:
+        instrumentId:
+          type: integer
+          format: int64
+          description: |
+            The id order submission takes, so a user goes from a search to an order without a
+            further lookup (FR-012, SC-008).
+          example: 47
+        ticker:
+          type: string
+          example: PAMP
+        name:
+          type: string
+          example: Pampa Holding S.A.
+        type:
+          type: string
+          description: |
+            The instrument's type as the market records it. Never `MONEDA`: cash is excluded from
+            the search (FR-023), so on the provided dataset this is `ACCIONES` on every result.
+          example: ACCIONES
+        close:
+          type: [number, "null"]
+          description: |
+            The latest `close` in pesos, from the most recent `marketdata` row **of that
+            instrument** — "latest" is resolved per instrument, never at one shared date (FR-016,
+            story 4.2). `null` when the instrument has no market data, or none with a `close`
+            (FR-018) — never `0` (ADR-0013). Scale 2.
+          example: 925.85
+        dailyReturnPercent:
+          type: [number, "null"]
+          description: |
+            The day's move, `(close − previousClose) / previousClose`, in **percent units**
+            (`0.44` means `0.44%`), from that same latest row (FR-017). Scale 2, `HALF_UP`
+            (ADR-0016).
+
+            This is the instrument's daily return, not a user's return on their own cost: the
+            portfolio reports the latter and never this one, which is why the statement's
+            `previousClose` rule is implemented here.
+
+            `null` when there is no market data, when `close` is unknown, and when
+            `previousClose` is unknown or zero — no division by zero occurs (FR-019). `0.00` is a
+            different answer from `null`: it means the instrument closed flat, and the provided
+            dataset contains one (`AGRO`).
+          example: 0.44
+
+    Problem:
+      type: object
+      description: |
+        RFC 9457 problem detail, unchanged from the live contract — this feature adds no new error
+        shape, only new causes of `400` (research R-113). Declared here so this document validates
+        on its own; it is **not** re-added to `docs/api/openapi.yaml`, which already carries it.
+      required: [title, status]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          default: about:blank
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference

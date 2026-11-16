@@ -126,36 +126,48 @@ compare the returned sets against the names measured above.
 
 ---
 
-### User Story 3 - Best matches first, and a bounded answer (Priority: P3)
+### User Story 3 - Best matches first, one page at a time (Priority: P3)
 
 A user whose query is broad — `a` matches 59 of the 65 searchable instruments — gets a short,
-ordered list rather than the whole market: the closest matches first, and the list capped at a
-known maximum. Within the same relevance tier results are ordered by ticker, so the same query
-always returns the same list in the same order.
+ordered page rather than the whole market: the closest matches first, a bounded number of them,
+and a statement of how many matched in total so they can ask for the next page or refine the
+query. Within the same relevance tier results are ordered by ticker, so the same query always
+returns the same page in the same order.
 
 Relevance, strongest first: an exact ticker match, then a ticker that starts with the query, then a
 name that starts with the query, then any other match on ticker or name.
 
 **Why this priority**: it is what turns a filter into a search. Without it the answer to a
 two-letter query is unusable and the response size is unbounded; without the tie-breaker the
-same query can return different lists on different runs, which no test can pin down.
+same query can return different pages on different runs, which no test can pin down.
 
-**Independent Test**: search for `a` and check the result is capped and ordered as specified;
-search twice and check the two responses are identical.
+**Independent Test**: search for `a` and check the page is bounded and ordered as specified, and
+that the response states 59 matched; ask for the second page and check it continues where the
+first stopped; search twice and check the two responses are identical.
 
 **Acceptance Scenarios**:
 
 1. **Given** the provided dataset, **When** a user searches `a`, **Then** the number of results
-   returned does not exceed the maximum, even though 59 instruments match.
+   returned does not exceed the page size, even though 59 instruments match.
 2. **Given** the same dataset, **When** a user searches `gr`, **Then** `GRIM` — whose ticker starts
    with `gr` — is ordered above `MOLA`, which matches only through its name (`Molinos Agro S.A.`).
 3. **Given** the same dataset, **When** a user searches `bma`, **Then** `BMA` is the first result,
    because an exact ticker match outranks every partial one.
 4. **Given** the same dataset, **When** the same query is sent twice with no data change,
    **Then** the two responses are byte-for-byte identical.
-5. **Given** a query that matches more instruments than the cap, **When** the response is read,
-   **Then** it states that the list was truncated, so the user knows to refine the query rather
-   than believing they have seen the whole market.
+5. **Given** a query that matches more instruments than one page holds, **When** the response is
+   read, **Then** it states how many matched in total and which page this is, so the user knows
+   to ask for the next page or refine the query rather than believing they have seen the whole
+   market.
+6. **Given** the same dataset and a query of `a`, **When** the user asks for the second page,
+   **Then** it continues exactly where the first stopped, with no instrument repeated and none
+   skipped — which only holds because the order is total.
+7. **Given** a request asking for a page beyond the last one, **When** the response is read,
+   **Then** it is an empty page with the same total, not an error: the search ran and that page
+   holds nothing.
+8. **Given** a request asking for a page size above the stated maximum, or for a negative page,
+   **When** it is received, **Then** it is rejected as a bad request rather than silently
+   adjusted, so the caller is never served a page different from the one they asked for.
 
 ---
 
@@ -199,8 +211,11 @@ are absent.
   no useful answer, and returning the whole market on a missing parameter hides the mistake from the
   caller.
 - **Query of one character.** `a` matches 59 of the 65 searchable instruments. It is a
-  legitimate query and is answered, bounded by the cap of story 3, rather than rejected — a
+  legitimate query and is answered, bounded by the page size of story 3, rather than rejected — a
   trader typing into a search box sees the first letter's results while they keep typing.
+- **A page past the end.** Asking for page 9 of a query that fills two pages returns an empty
+  page carrying the real total, not an error and not the last page. Asking for a negative page, or
+  for a page larger than the maximum, is a bad request.
 - **No match at all.** `ZZZZ` returns an empty list with a success status, not a not-found error:
   the search ran and its answer is "nothing matches". This is distinguishable from the rejection of
   a blank query.
@@ -260,8 +275,22 @@ are absent.
   ticker starting with the query, then name starting with the query, then any other match.
 - **FR-014**: Results within the same relevance tier MUST be ordered by ticker, so that the same
   query over unchanged data always returns the same list in the same order.
-- **FR-015**: The number of results MUST be bounded by a maximum the caller cannot exceed, and the
-  response MUST indicate when the list was truncated.
+- **FR-015**: Results MUST be paginated. The response MUST carry one page of results plus the
+  page requested, the page size in force, and the total number of instruments that matched, so a
+  caller can tell whether more exist and ask for them.
+- **FR-015a**: The caller MAY ask for a page size of their own, so a client that wants more than
+  the default can have it in one request. The page size MUST still be bounded by a maximum the
+  caller cannot exceed, and a request for a larger page, for a page size below one, or for a
+  negative page number, MUST be rejected as a bad request rather than silently adjusted. A
+  request that names neither page nor size MUST be served the default page size.
+- **FR-015c**: The default page size MUST be configurable per deployment, without rebuilding the
+  application, so an operator can tune it against real traffic. The maximum page size and the
+  maximum query length MUST be configurable the same way. Each MUST have a stated value that
+  applies when nothing is configured, and the values in force MUST be observable in the response
+  (the page size is echoed) or in a rejection (the maximum is named).
+- **FR-015b**: Paging MUST be consistent: over unchanged data, consecutive pages of the same query
+  MUST together return every match exactly once, in the order of FR-013 and FR-014. A page beyond
+  the last MUST be an empty page carrying the real total, not an error.
 - **FR-016**: Each result MUST carry the latest `close` of that instrument in pesos, resolved per
   instrument rather than at one shared date.
 - **FR-017**: Each result MUST carry the instrument's daily return as a percentage,
@@ -312,8 +341,8 @@ are absent.
 - **SC-004**: On the same dataset, searching `metr` returns exactly one result, not two, although
   the query matches both the ticker and the name of `METR`.
 - **SC-005**: On the same dataset, searching `a` — which matches 59 of the 65 searchable
-  instruments — returns no
-  more than the stated maximum, and the response says the list was truncated.
+  instruments — returns no more than one page, and the response states that 59 matched. Walking
+  the pages of that query returns all 59 instruments exactly once, in the specified order.
 - **SC-006**: On the same dataset, searching `bma` returns `BMA` first, and searching `gr` returns
   `GRIM` above `MOLA`.
 - **SC-007**: Two identical searches with no intervening data change return identical responses,
@@ -348,18 +377,29 @@ are absent.
   requires prices in pesos and this is the endpoint a user reads before deciding what to trade.
   Story 4 is P4 and strictly additive only because it is the last thing to build, not because it
   is optional.
-- A result cap with a truncation flag is preferred to full pagination. The whole market is 65
-  searchable instruments, so pages would be ceremony over a list that fits in one response; a cap
-  plus "there is more, refine your query" is the honest answer. If the market grew, pagination
-  would be a later feature, not a change to these rules.
+- **Results are paginated, not capped with a truncation flag**, decided by the author on
+  2026-11-16. The earlier draft of this spec preferred a cap plus "there is more, refine your
+  query", on the grounds that pages are ceremony over a market of 65 instruments. That reasoning
+  was rejected: the endpoint is designed for a market that grows, a cap discards matches with no
+  way to reach them, and a client that wants the rest should not have to guess at a narrower
+  query to get it. The total match count that pagination publishes also tells the caller how much
+  they have not seen, which the flag only hinted at.
 - Accent folding is assumed to be the right default rather than exact matching, because the three
   accented names in the dataset are otherwise unreachable from a keyboard-typed query — measured:
   `rio` misses `Molinos Río de la Plata` and `compania` misses `Compañía Introductora` without it.
 - Relevance tiers are a presentation decision made here (not in the statement) so that the ordering
   is testable; the tie-break on ticker exists so acceptance scenarios can assert an exact list.
-- The exact maximum query length and the exact result cap are not set by the statement; concrete
-  values are chosen at plan time, and the requirements above only demand that both exist, are
-  stated, and are observable.
+- The exact maximum query length, the default page size and the maximum page size are not set by
+  the statement; concrete values are chosen at plan time, and the requirements above only demand
+  that they exist, are stated, and are observable. They are **configuration, not constants**
+  (FR-015c), decided by the author on 2026-11-16: the right page size depends on traffic nobody
+  has measured yet, so it is a dial an operator turns rather than a number a release changes.
+- **The search itself is executed by the database**, decided by the author on 2026-11-16: the
+  filtering, the relevance ordering and the paging happen in the query, so only one page of rows
+  ever crosses the wire. This is a constraint on the implementation rather than on the behaviour
+  — every requirement above is written in terms of what the caller observes and none of them
+  changes — but it is recorded here because it was a deliberate choice between two designs, and
+  because it is what the plan's ADR and its measurements have to justify.
 - **Cash is not an asset, so the search never returns it** (FR-023), confirmed by the author on
   2026-11-16. The rule is written against the `MONEDA` type rather than against `ARS`, so it keeps
   holding if another currency is added. It is the same exclusion the portfolio applies to positions
