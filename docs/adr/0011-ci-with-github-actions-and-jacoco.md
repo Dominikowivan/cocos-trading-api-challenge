@@ -1,6 +1,6 @@
 # ADR-0011: CI on GitHub Actions, with coverage reported
 
-- **Status:** Accepted
+- **Status:** Accepted; coverage enforcement superseded by [ADR-0020](0020-static-analysis-on-sonarqube-cloud.md)
 - **Date:** 2026-11-15
 - **Journal:** [02Setup](../journal/02Setup.md)
 

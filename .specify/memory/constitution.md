@@ -1,5 +1,25 @@
 <!--
 Sync Impact Report
+- Version change: 2.1.0 → 2.2.0 (MINOR: materially expanded guidance)
+- Modified principles: none
+- Modified sections:
+  - Technology and Scope Constraints — the API contract lives in `docs/api/openapi.yaml`, one file
+    for the whole API, and every response in the web tests validates against it (ADR-0024). A
+    feature's `specs/NNN/contracts/` is its design-time proposal, not edited once implemented; a
+    feature that changes the API applies the change to `docs/api/openapi.yaml` and
+    `docs/api/trading-api.http`
+  - Development Workflow — the CI rule lists what a green build now includes (ArchUnit,
+    formatting, Trivy) and the SonarQube Cloud gate on pull requests. Replaces "JaCoCo coverage is
+    reported, not gated", which ADR-0020 had contradicted: the gate requires 80% coverage on new
+    code
+- Added sections: none
+- Removed sections: none
+- Templates: not modified (they read this file at runtime)
+- Origin: the portfolio's contract lived only in its spec, where nothing validated it and where a
+  later feature changing the endpoint would have had to rewrite a historical document
+- Deferred TODOs: none
+
+Previous report (2.1.0, 2026-11-15)
 - Version change: 2.0.0 → 2.1.0 (MINOR: materially expanded guidance)
 - Modified principles:
   - V. Tests Run on the Real Engine — every behaviour a feature adds MUST be tested at the level
@@ -250,6 +270,11 @@ nobody measured costs that readability and buys nothing anyone can show.
 - The API is versioned under `/api/v1`. Its endpoints are portfolio, instrument search, order
   submission and order cancellation. A new endpoint requires a spec and, if it had alternatives,
   an ADR.
+- The API contract is `docs/api/openapi.yaml`, one file for the whole API, and every response in
+  the web tests MUST validate against it (ADR-0024). A feature's `specs/NNN/contracts/` is its
+  design-time proposal and MUST NOT be edited once the feature is implemented; a feature that
+  changes the API applies the change to `docs/api/openapi.yaml` and `docs/api/trading-api.http`
+  as part of its implementation.
 - Out of scope by decision (ADR-0007): no matching engine and no authentication. A `LIMIT` order
   is born `NEW` and leaves it only by cancellation; a `MARKET` order fills at the last close.
   Features MUST NOT assume `LIMIT` orders stay `NEW` forever.
@@ -273,8 +298,12 @@ nobody measured costs that readability and buys nothing anyone can show.
 - Every user story ends with a refactor task: with its tests green, the code it added is reviewed
   against principle IX and cleaned before the story is marked done. This is the refactor step of
   red-green-refactor, kept even where the tests were not written first.
-- CI (GitHub Actions) MUST be green before merging: full build, full suite including
-  Testcontainers tests. JaCoCo coverage is reported, not gated.
+- CI (GitHub Actions) MUST be green before merging. Every run builds and runs the full suite,
+  Testcontainers tests included, with the architecture rules (ArchUnit, ADR-0018) and the
+  formatting check (ADR-0019) inside the build, and scans dependencies and secrets with Trivy
+  (ADR-0023). Pull requests into `develop` also pass the SonarQube Cloud quality gate (ADR-0020,
+  ADR-0021), which requires at least 80% coverage on new code: coverage is gated there, on new
+  code only. JaCoCo produces the report on every run and gates nothing by itself.
 - Agent tooling under `.specify/` and `.claude/` is versioned configuration, so every developer
   works with the same skills and what they produce stays coherent. Machine-local agent state
   (`.agent-home/`) and generated artifacts are not committed.
@@ -291,4 +320,4 @@ nobody measured costs that readability and buys nothing anyone can show.
 - Compliance is checked at plan time (Constitution Check) and at review. Runtime guidance for
   developers lives in `README.md` and `docs/adr/`.
 
-**Version**: 2.1.0 | **Ratified**: 2026-11-15 | **Last Amended**: 2026-11-15
+**Version**: 2.2.0 | **Ratified**: 2026-11-15 | **Last Amended**: 2026-11-16
