@@ -66,14 +66,6 @@ public abstract sealed class TradeQuantity {
 		}
 	}
 
-	private static BigDecimal derived(BigDecimal shares, BigDecimal pesos, Price price) {
-		if (shares.compareTo(LARGEST_SIZE) > 0) {
-			throw new IllegalArgumentException(pesos.toPlainString() + " at " + price + " is " + shares.toPlainString()
-					+ " shares, more than the " + LARGEST_SIZE.toPlainString() + " an order can carry");
-		}
-		return shares;
-	}
-
 	private static final class ExactSize extends TradeQuantity {
 
 		private final BigDecimal size;
@@ -114,12 +106,21 @@ public abstract sealed class TradeQuantity {
 
 		@Override
 		public BigDecimal sizeAt(Price price) {
-			return derived(price.wholeSharesIn(pesos), pesos, price);
+			return derived(price.wholeSharesIn(pesos), price);
 		}
 
 		@Override
 		public BigDecimal requestedSize() {
 			return BigDecimal.ZERO;
+		}
+
+		private BigDecimal derived(BigDecimal shares, Price price) {
+			if (shares.compareTo(LARGEST_SIZE) > 0) {
+				throw new IllegalArgumentException(
+						pesos.toPlainString() + " at " + price + " is " + shares.toPlainString()
+								+ " shares, more than the " + LARGEST_SIZE.toPlainString() + " an order can carry");
+			}
+			return shares;
 		}
 
 	}

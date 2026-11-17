@@ -23,6 +23,8 @@ class LedgerAuditAgreementTest extends PersistenceTestBase {
 
 	private static final long PAMP = 47;
 
+	private static final int NO_SIZE_DERIVED = 0;
+
 	@Autowired
 	private OrderSubmissionService orderSubmissionService;
 
@@ -50,13 +52,13 @@ class LedgerAuditAgreementTest extends PersistenceTestBase {
 	@Test
 	void every_order_this_feature_wrote_has_exactly_one_history_row() {
 		assertThat(writtenOrders()).isNotEmpty()
-			.allSatisfy(order -> assertThat(order.get("transitions")).isEqualTo(1L));
+			.allSatisfy(order -> assertThat(order).containsEntry("transitions", 1L));
 	}
 
 	@Test
 	void the_history_row_states_the_status_the_order_is_in() {
 		assertThat(writtenOrders())
-			.allSatisfy(order -> assertThat(order.get("history_status")).isEqualTo(order.get("status")));
+			.allSatisfy(order -> assertThat(order).containsEntry("history_status", order.get("status")));
 	}
 
 	@Test
@@ -69,7 +71,7 @@ class LedgerAuditAgreementTest extends PersistenceTestBase {
 				assertThat(order.get("reason")).isNull();
 			}
 		});
-		assertThat(writtenOrders()).anySatisfy(order -> assertThat(order.get("status")).isEqualTo("REJECTED"));
+		assertThat(writtenOrders()).anySatisfy(order -> assertThat(order).containsEntry("status", "REJECTED"));
 	}
 
 	@Test
@@ -80,19 +82,18 @@ class LedgerAuditAgreementTest extends PersistenceTestBase {
 	@Test
 	void a_size_of_zero_only_ever_belongs_to_a_rejection_that_derived_none() {
 		assertThat(writtenOrders()).allSatisfy(order -> {
-			if (BigDecimal.ZERO.intValue() == ((Number) order.get("size")).intValue()) {
-				assertThat(order.get("status")).isEqualTo("REJECTED");
-				assertThat(order.get("reason")).isEqualTo("SIZE_BELOW_ONE_SHARE");
+			if (NO_SIZE_DERIVED == ((Number) order.get("size")).intValue()) {
+				assertThat(order).containsEntry("status", "REJECTED").containsEntry("reason", "SIZE_BELOW_ONE_SHARE");
 			}
 		});
 		assertThat(writtenOrders())
-			.anySatisfy(order -> assertThat(order.get("reason")).isEqualTo("SIZE_BELOW_ONE_SHARE"));
+			.anySatisfy(order -> assertThat(order).containsEntry("reason", "SIZE_BELOW_ONE_SHARE"));
 	}
 
 	@Test
 	void the_ledger_and_the_audit_trail_agree_on_when_it_happened() {
 		assertThat(writtenOrders())
-			.allSatisfy(order -> assertThat(order.get("changed_at")).isEqualTo(order.get("datetime")));
+			.allSatisfy(order -> assertThat(order).containsEntry("changed_at", order.get("datetime")));
 	}
 
 	private List<Map<String, Object>> writtenOrders() {

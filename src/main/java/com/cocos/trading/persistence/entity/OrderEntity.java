@@ -53,18 +53,8 @@ public class OrderEntity {
 	protected OrderEntity() {
 	}
 
-	public static OrderEntity newOrder(Integer userId, Integer instrumentId, int size, BigDecimal price, String side,
-			String status, String type, LocalDateTime datetime) {
-		OrderEntity order = new OrderEntity();
-		order.userId = userId;
-		order.instrumentId = instrumentId;
-		order.size = size;
-		order.price = price;
-		order.side = side;
-		order.status = status;
-		order.type = type;
-		order.datetime = datetime;
-		return order;
+	public static Builder newOrder() {
+		return new Builder();
 	}
 
 	public Integer getId() {
@@ -101,6 +91,55 @@ public class OrderEntity {
 
 	public LocalDateTime getDatetime() {
 		return datetime;
+	}
+
+	public static final class Builder {
+
+		private final OrderEntity order = new OrderEntity();
+
+		private Builder() {
+		}
+
+		public Builder ofUser(Integer userId) {
+			order.userId = userId;
+			return this;
+		}
+
+		public Builder inInstrument(Integer instrumentId) {
+			order.instrumentId = instrumentId;
+			return this;
+		}
+
+		public Builder ofSize(int size) {
+			order.size = size;
+			return this;
+		}
+
+		public Builder atPrice(BigDecimal price) {
+			order.price = price;
+			return this;
+		}
+
+		public Builder onSide(String side) {
+			order.side = side;
+			return this;
+		}
+
+		public Builder withStatus(String status) {
+			order.status = status;
+			return this;
+		}
+
+		public Builder ofType(String type) {
+			order.type = type;
+			return this;
+		}
+
+		public OrderEntity placedAt(LocalDateTime datetime) {
+			order.datetime = datetime;
+			return order;
+		}
+
 	}
 
 }

@@ -18,7 +18,7 @@ class ConcurrentSellSubmissionTest extends SubmissionWebTestBase {
 	private static final String HALF_THE_PAMP_POSITION = marketOrderOf(PAMP, "SELL", sizeOf(20));
 
 	@RepeatedTest(5)
-	void two_sales_of_the_whole_position_fill_exactly_one() throws Exception {
+	void two_sales_of_the_whole_position_fill_exactly_one() {
 		List<String> outcomes = outcomesOf(SEEDED_USER, THE_WHOLE_PAMP_POSITION, SEEDED_USER, THE_WHOLE_PAMP_POSITION);
 
 		assertThat(statusesIn(outcomes)).containsExactlyInAnyOrder("FILLED", "REJECTED");
@@ -36,14 +36,14 @@ class ConcurrentSellSubmissionTest extends SubmissionWebTestBase {
 	}
 
 	@Test
-	void two_sales_that_both_fit_are_both_filled() throws Exception {
+	void two_sales_that_both_fit_are_both_filled() {
 		List<String> outcomes = outcomesOf(SEEDED_USER, HALF_THE_PAMP_POSITION, SEEDED_USER, HALF_THE_PAMP_POSITION);
 
 		assertThat(statusesIn(outcomes)).containsExactly("FILLED", "FILLED");
 	}
 
 	@Test
-	void two_users_submitting_at_once_are_both_served() throws Exception {
+	void two_users_submitting_at_once_are_both_served() {
 		fund(NEVER_TRADED_USER, 500000);
 
 		List<String> outcomes = outcomesOf(SEEDED_USER, marketOrderOf(PAMP, "BUY", sizeOf(400)), NEVER_TRADED_USER,

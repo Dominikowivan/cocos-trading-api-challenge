@@ -70,46 +70,46 @@ public class OrderSubmissionService {
 		RequestedSubmission requested = RequestedSubmission.read(request);
 		Integer userIdColumn = existingUser(requested.userId());
 
-		return requested.idempotencyKey()
-			.map(key -> theOneOutcomeUnder(key, requested, userIdColumn))
+		return requested.idempotent()
+			.map(idempotent -> theOneOutcomeUnder(idempotent, requested, userIdColumn))
 			.orElseGet(() -> placedOrderOf(requested, userIdColumn));
 	}
 
-	private SubmittedOrder theOneOutcomeUnder(IdempotencyKey key, RequestedSubmission requested, Integer userIdColumn) {
-		if (claimed(key, requested, userIdColumn)) {
-			return attachedTo(key, userIdColumn, placedOrderOf(requested, userIdColumn));
+	private SubmittedOrder theOneOutcomeUnder(IdempotentRequest idempotent, RequestedSubmission requested,
+			Integer userIdColumn) {
+		if (claimed(idempotent, userIdColumn)) {
+			return attachedTo(idempotent, userIdColumn, placedOrderOf(requested, userIdColumn));
 		}
-		return theOutcomeAlreadyRecordedFor(key, requested, userIdColumn);
+		return theOutcomeAlreadyRecordedFor(idempotent, userIdColumn);
 	}
 
-	private boolean claimed(IdempotencyKey key, RequestedSubmission requested, Integer userIdColumn) {
-		return orderIdempotencyRepository.claim(userIdColumn, key.value(), requested.fingerprint().hex(),
+	private boolean claimed(IdempotentRequest idempotent, Integer userIdColumn) {
+		return orderIdempotencyRepository.claim(userIdColumn, idempotent.keyValue(), idempotent.fingerprintHex(),
 				now()) != NOTHING_WRITTEN;
 	}
 
-	private SubmittedOrder attachedTo(IdempotencyKey key, Integer userIdColumn, SubmittedOrder order) {
-		orderIdempotencyRepository.attachOrderTo(userIdColumn, key.value(), Math.toIntExact(order.orderId()));
+	private SubmittedOrder attachedTo(IdempotentRequest idempotent, Integer userIdColumn, SubmittedOrder order) {
+		orderIdempotencyRepository.attachOrderTo(userIdColumn, idempotent.keyValue(), Math.toIntExact(order.orderId()));
 		return order;
 	}
 
-	private SubmittedOrder theOutcomeAlreadyRecordedFor(IdempotencyKey key, RequestedSubmission requested,
-			Integer userIdColumn) {
-		if (!requested.fingerprint().matches(recordedFingerprintOf(key, userIdColumn))) {
-			throw new IdempotencyConflictException(key.value());
+	private SubmittedOrder theOutcomeAlreadyRecordedFor(IdempotentRequest idempotent, Integer userIdColumn) {
+		if (!idempotent.wasSentBefore(recordedFingerprintOf(idempotent, userIdColumn))) {
+			throw new IdempotencyConflictException(idempotent.keyValue());
 		}
-		return recordedOrder(recordedOrderIdOf(key, userIdColumn));
+		return recordedOrder(recordedOrderIdOf(idempotent, userIdColumn));
 	}
 
-	private String recordedFingerprintOf(IdempotencyKey key, Integer userIdColumn) {
-		return orderIdempotencyRepository.fingerprintOf(userIdColumn, key.value())
+	private String recordedFingerprintOf(IdempotentRequest idempotent, Integer userIdColumn) {
+		return orderIdempotencyRepository.fingerprintOf(userIdColumn, idempotent.keyValue())
 			.orElseThrow(() -> new IllegalStateException(
-					"the key " + key.value() + " was claimed by another request that then left no row"));
+					"the key " + idempotent.keyValue() + " was claimed by another request that then left no row"));
 	}
 
-	private Integer recordedOrderIdOf(IdempotencyKey key, Integer userIdColumn) {
-		return orderIdempotencyRepository.orderIdOf(userIdColumn, key.value())
+	private Integer recordedOrderIdOf(IdempotentRequest idempotent, Integer userIdColumn) {
+		return orderIdempotencyRepository.orderIdOf(userIdColumn, idempotent.keyValue())
 			.orElseThrow(() -> new IllegalStateException(
-					"the key " + key.value() + " names no order, which a committed claim always does"));
+					"the key " + idempotent.keyValue() + " names no order, which a committed claim always does"));
 	}
 
 	private SubmittedOrder recordedOrder(Integer orderId) {

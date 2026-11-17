@@ -25,7 +25,7 @@ class UserLockContentionTest extends PersistenceTestBase {
 
 	private static final int ARS = 66;
 
-	private static final long HELD_MILLIS = 500;
+	private static final long LONG_ENOUGH_FOR_THE_WAITER_TO_BLOCK_MILLIS = 500;
 
 	@Autowired
 	private UserRepository userRepository;
@@ -56,7 +56,7 @@ class UserLockContentionTest extends PersistenceTestBase {
 			insertCashInThrough(holder);
 			waiter.start();
 			waiterStarted.await();
-			TimeUnit.MILLISECONDS.sleep(HELD_MILLIS);
+			TimeUnit.MILLISECONDS.sleep(LONG_ENOUGH_FOR_THE_WAITER_TO_BLOCK_MILLIS);
 			committedAt = System.nanoTime();
 			holder.commit();
 		}
