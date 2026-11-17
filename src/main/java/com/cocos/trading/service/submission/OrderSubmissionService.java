@@ -24,6 +24,7 @@ import com.cocos.trading.model.user.UnknownUserException;
 import com.cocos.trading.model.user.UserId;
 import com.cocos.trading.persistence.InstrumentRepository;
 import com.cocos.trading.persistence.MarketDataRepository;
+import com.cocos.trading.persistence.OrderIdempotencyRepository;
 import com.cocos.trading.persistence.OrderRepository;
 import com.cocos.trading.persistence.OrderStatusHistoryRepository;
 import com.cocos.trading.persistence.UserRepository;
@@ -36,6 +37,8 @@ import com.cocos.trading.persistence.mapper.UserMapper;
 @Transactional(isolation = Isolation.READ_COMMITTED)
 public class OrderSubmissionService {
 
+	private static final int NOTHING_WRITTEN = 0;
+
 	private final UserRepository userRepository;
 
 	private final InstrumentRepository instrumentRepository;
@@ -46,37 +49,102 @@ public class OrderSubmissionService {
 
 	private final OrderStatusHistoryRepository orderStatusHistoryRepository;
 
+	private final OrderIdempotencyRepository orderIdempotencyRepository;
+
 	private final Clock clock;
 
 	public OrderSubmissionService(UserRepository userRepository, InstrumentRepository instrumentRepository,
 			MarketDataRepository marketDataRepository, OrderRepository orderRepository,
-			OrderStatusHistoryRepository orderStatusHistoryRepository, Clock clock) {
+			OrderStatusHistoryRepository orderStatusHistoryRepository,
+			OrderIdempotencyRepository orderIdempotencyRepository, Clock clock) {
 		this.userRepository = userRepository;
 		this.instrumentRepository = instrumentRepository;
 		this.marketDataRepository = marketDataRepository;
 		this.orderRepository = orderRepository;
 		this.orderStatusHistoryRepository = orderStatusHistoryRepository;
+		this.orderIdempotencyRepository = orderIdempotencyRepository;
 		this.clock = clock;
 	}
 
 	public SubmittedOrder submit(SubmissionRequest request) {
 		RequestedSubmission requested = RequestedSubmission.read(request);
-		UserId userId = new UserId(request.userId());
-		Integer userIdColumn = lockedUser(userId);
+		Integer userIdColumn = existingUser(requested.userId());
+
+		return requested.idempotencyKey()
+			.map(key -> theOneOutcomeUnder(key, requested, userIdColumn))
+			.orElseGet(() -> placedOrderOf(requested, userIdColumn));
+	}
+
+	private SubmittedOrder theOneOutcomeUnder(IdempotencyKey key, RequestedSubmission requested, Integer userIdColumn) {
+		if (claimed(key, requested, userIdColumn)) {
+			return attachedTo(key, userIdColumn, placedOrderOf(requested, userIdColumn));
+		}
+		return theOutcomeAlreadyRecordedFor(key, requested, userIdColumn);
+	}
+
+	private boolean claimed(IdempotencyKey key, RequestedSubmission requested, Integer userIdColumn) {
+		return orderIdempotencyRepository.claim(userIdColumn, key.value(), requested.fingerprint().hex(),
+				now()) != NOTHING_WRITTEN;
+	}
+
+	private SubmittedOrder attachedTo(IdempotencyKey key, Integer userIdColumn, SubmittedOrder order) {
+		orderIdempotencyRepository.attachOrderTo(userIdColumn, key.value(), Math.toIntExact(order.orderId()));
+		return order;
+	}
+
+	private SubmittedOrder theOutcomeAlreadyRecordedFor(IdempotencyKey key, RequestedSubmission requested,
+			Integer userIdColumn) {
+		if (!requested.fingerprint().matches(recordedFingerprintOf(key, userIdColumn))) {
+			throw new IdempotencyConflictException(key.value());
+		}
+		return recordedOrder(recordedOrderIdOf(key, userIdColumn));
+	}
+
+	private String recordedFingerprintOf(IdempotencyKey key, Integer userIdColumn) {
+		return orderIdempotencyRepository.fingerprintOf(userIdColumn, key.value())
+			.orElseThrow(() -> new IllegalStateException(
+					"the key " + key.value() + " was claimed by another request that then left no row"));
+	}
+
+	private Integer recordedOrderIdOf(IdempotencyKey key, Integer userIdColumn) {
+		return orderIdempotencyRepository.orderIdOf(userIdColumn, key.value())
+			.orElseThrow(() -> new IllegalStateException(
+					"the key " + key.value() + " names no order, which a committed claim always does"));
+	}
+
+	private SubmittedOrder recordedOrder(Integer orderId) {
+		NewOrder recorded = orderRepository.findPlacedOrder(orderId)
+			.orElseThrow(() -> new IllegalStateException("order " + orderId + " is named by a key but is not stored"));
+		return SubmittedOrder.of(orderId, withTheReasonItWasRejectedFor(recorded, orderId));
+	}
+
+	private NewOrder withTheReasonItWasRejectedFor(NewOrder recorded, Integer orderId) {
+		return orderStatusHistoryRepository.reasonOf(orderId).map(recorded::rejectedFor).orElse(recorded);
+	}
+
+	private SubmittedOrder placedOrderOf(RequestedSubmission requested, Integer userIdColumn) {
+		lockUser(userIdColumn, requested.userId());
+
 		PricedSubmission submission = priceGoverning(submissionOf(requested));
 
 		OrderDecision decision = refusing(() -> submission.decide(availabilityOf(userIdColumn)));
 
-		NewOrder order = submission.placedBy(userId, decision, now());
+		NewOrder order = submission.placedBy(requested.userId(), decision, now());
 		Integer orderId = orderRepository.append(order);
 		orderStatusHistoryRepository.appendTransitionOf(orderId, order);
 		return SubmittedOrder.of(orderId, order);
 	}
 
-	private Integer lockedUser(UserId userId) {
+	private Integer existingUser(UserId userId) {
 		return UserMapper.toIdColumn(userId)
-			.filter(idColumn -> userRepository.lockById(idColumn).isPresent())
+			.filter(userRepository::existsById)
 			.orElseThrow(() -> new UnknownUserException(userId));
+	}
+
+	private void lockUser(Integer userIdColumn, UserId userId) {
+		if (userRepository.lockById(userIdColumn).isEmpty()) {
+			throw new UnknownUserException(userId);
+		}
 	}
 
 	private Submission submissionOf(RequestedSubmission requested) {

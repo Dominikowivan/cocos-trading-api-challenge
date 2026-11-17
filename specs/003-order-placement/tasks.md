@@ -190,19 +190,19 @@ Single-module Maven web service (plan.md, *Project Structure*): sources under `s
 
 ### Tests for User Story 5 (REQUIRED - constitution V)
 
-- [ ] T062 [P] [US5] Testcontainers two-thread test of quickstart scenario 11 in src/test/java/com/cocos/trading/controller/ConcurrentBuySubmissionTest.java: two `MARKET BUY` orders of 400 `PAMP` for user `1` end with exactly one `FILLED` and one `REJECTED` for insufficient funds, and the final available cash is the one the single fill implies (SC-010, FR-026)
-- [ ] T063 [P] [US5] Testcontainers two-thread test in src/test/java/com/cocos/trading/controller/ConcurrentSellSubmissionTest.java: two `MARKET SELL` orders of 40 `PAMP` end with exactly one `FILLED`, the position never driven negative by these writes; two submissions that both fit are both `FILLED`; and concurrent submissions by two different users both complete with neither rejected on account of the other (FR-026, FR-027)
-- [ ] T064 [P] [US5] Testcontainers test in src/test/java/com/cocos/trading/persistence/UserLockContentionTest.java that a second transaction's `lockById` blocks until the first commits and then reads what it committed, which is the `READ COMMITTED` behaviour the design rests on (R-209, R-211)
-- [ ] T065 [P] [US5] Test in src/test/java/com/cocos/trading/controller/SubmissionLockDeadlineTest.java that a submission which waits past the transaction deadline answers `503` with nothing written, through the unchanged handler (R-209 *Consequence*, ADR-0031)
+- [X] T062 [P] [US5] Testcontainers two-thread test of quickstart scenario 11 in src/test/java/com/cocos/trading/controller/ConcurrentBuySubmissionTest.java: two `MARKET BUY` orders of 400 `PAMP` for user `1` end with exactly one `FILLED` and one `REJECTED` for insufficient funds, and the final available cash is the one the single fill implies (SC-010, FR-026)
+- [X] T063 [P] [US5] Testcontainers two-thread test in src/test/java/com/cocos/trading/controller/ConcurrentSellSubmissionTest.java: two `MARKET SELL` orders of 40 `PAMP` end with exactly one `FILLED`, the position never driven negative by these writes; two submissions that both fit are both `FILLED`; and concurrent submissions by two different users both complete with neither rejected on account of the other (FR-026, FR-027)
+- [X] T064 [P] [US5] Testcontainers test in src/test/java/com/cocos/trading/persistence/UserLockContentionTest.java that a second transaction's `lockById` blocks until the first commits and then reads what it committed, which is the `READ COMMITTED` behaviour the design rests on (R-209, R-211)
+- [X] T065 [P] [US5] Test in src/test/java/com/cocos/trading/controller/SubmissionLockDeadlineTest.java that a submission which waits past the transaction deadline answers `503` with nothing written, through the unchanged handler (R-209 *Consequence*, ADR-0031)
 
 ### Implementation for User Story 5
 
-- [ ] T066 [US5] Write ADR-0035 in docs/adr/0035-submissions-are-serialised-per-user.md (the pessimistic lock on the `users` row at `READ COMMITTED`, with the `SERIALIZABLE`, advisory-lock, `version`-column, lock-the-orders and table-lock alternatives from R-209 and R-211) and add its row to docs/adr/README.md
-- [ ] T067 [US5] Annotate the submission method in src/main/java/com/cocos/trading/service/submission/OrderSubmissionService.java `@Transactional(isolation = READ_COMMITTED)`, not read-only, and make `UserRepository.lockById` its **first** statement so the fold, the decision and both inserts run under that lock (FR-026, FR-027, R-209, R-211)
+- [X] T066 [US5] Write ADR-0036 in docs/adr/0036-submissions-are-serialised-per-user.md (0035 was taken by the price-type refactor) (the pessimistic lock on the `users` row at `READ COMMITTED`, with the `SERIALIZABLE`, advisory-lock, `version`-column, lock-the-orders and table-lock alternatives from R-209 and R-211) and add its row to docs/adr/README.md
+- [X] T067 [US5] Annotate the submission method in src/main/java/com/cocos/trading/service/submission/OrderSubmissionService.java `@Transactional(isolation = READ_COMMITTED)`, not read-only, and make `UserRepository.lockById` its **first** statement so the fold, the decision and both inserts run under that lock (FR-026, FR-027, R-209, R-211)
 
 ### Refactor for User Story 5
 
-- [ ] T068 [US5] Refactor: with this story's tests green, review src/main/java/com/cocos/trading/service/submission/OrderSubmissionService.java against constitution IX — the public method reading as the summary of its steps in call order, the step order itself being the rule data-model.md section 4 states — and clean it; the tests stay green and no behaviour changes
+- [X] T068 [US5] Refactor: with this story's tests green, review src/main/java/com/cocos/trading/service/submission/OrderSubmissionService.java against constitution IX — the public method reading as the summary of its steps in call order, the step order itself being the rule data-model.md section 4 states — and clean it; the tests stay green and no behaviour changes
 
 **Checkpoint**: every validation in US1-US4 is now enforced rather than advisory
 
@@ -216,27 +216,27 @@ Single-module Maven web service (plan.md, *Project Structure*): sources under `s
 
 ### Tests for User Story 6 (REQUIRED - constitution V)
 
-- [ ] T069 [P] [US6] Testcontainers test in src/test/java/com/cocos/trading/persistence/OrderIdempotencySchemaTest.java that `V5` applies on top of the given schema and that `UNIQUE (userid, idempotency_key)`, both foreign keys and the nullable `order_id` are in place
-- [ ] T070 [P] [US6] Plain-Java test of the fingerprint's canonical form in src/test/java/com/cocos/trading/service/submission/RequestFingerprintTest.java: the same request hashes identically regardless of JSON key order or whitespace, money normalised to scale 2 (`900` and `900.00` agree), 64 hex characters, and the key itself is not part of the hash (R-210)
-- [ ] T071 [P] [US6] Testcontainers test in src/test/java/com/cocos/trading/persistence/OrderIdempotencyClaimTest.java: `claim` writes one row and reports `1` for the first caller and `0` for the second, `findByUser` reads the committed row back with its `order_id` set, and the same key for two users is two independent rows (FR-028, FR-030)
-- [ ] T072 [P] [US6] MockMvc test of quickstart scenario 12 in src/test/java/com/cocos/trading/controller/IdempotentSubmissionTest.java: the identical retry returns the same order id and status with exactly one order in the ledger; the same key with a different body → `409` and nothing written; the same key for user `2` is processed as a new request; a `REJECTED` outcome is replayed and not re-decided; and a submission with no key is processed normally (SC-011, FR-028 to FR-031)
-- [ ] T073 [P] [US6] Testcontainers two-thread test in src/test/java/com/cocos/trading/controller/ConcurrentIdempotentSubmissionTest.java that two requests with the same key submitted at the same instant yield exactly one order, the loser blocking on the unique index and then returning the committed outcome (FR-028, R-210, R-211)
+- [X] T069 [P] [US6] Testcontainers test in src/test/java/com/cocos/trading/persistence/OrderIdempotencySchemaTest.java that `V5` applies on top of the given schema and that `UNIQUE (userid, idempotency_key)`, both foreign keys and the nullable `order_id` are in place
+- [X] T070 [P] [US6] Plain-Java test of the fingerprint's canonical form in src/test/java/com/cocos/trading/service/submission/RequestFingerprintTest.java: the same request hashes identically regardless of JSON key order or whitespace, money normalised to scale 2 (`900` and `900.00` agree), 64 hex characters, and the key itself is not part of the hash (R-210)
+- [X] T071 [P] [US6] Testcontainers test in src/test/java/com/cocos/trading/persistence/OrderIdempotencyClaimTest.java: `claim` writes one row and reports `1` for the first caller and `0` for the second, `findByUser` reads the committed row back with its `order_id` set, and the same key for two users is two independent rows (FR-028, FR-030)
+- [X] T072 [P] [US6] MockMvc test of quickstart scenario 12 in src/test/java/com/cocos/trading/controller/IdempotentSubmissionTest.java: the identical retry returns the same order id and status with exactly one order in the ledger; the same key with a different body → `409` and nothing written; the same key for user `2` is processed as a new request; a `REJECTED` outcome is replayed and not re-decided; and a submission with no key is processed normally (SC-011, FR-028 to FR-031)
+- [X] T073 [P] [US6] Testcontainers two-thread test in src/test/java/com/cocos/trading/controller/ConcurrentIdempotentSubmissionTest.java that two requests with the same key submitted at the same instant yield exactly one order, the loser blocking on the unique index and then returning the committed outcome (FR-028, R-210, R-211)
 
 ### Implementation for User Story 6
 
-- [ ] T074 [US6] Write ADR-0036 in docs/adr/0036-idempotent-submission-with-a-caller-key.md (the header, the fingerprint and `ON CONFLICT DO NOTHING`, with the body-field, stored-body, always-`409`, fingerprint-only and expiring-key alternatives from R-210, and the kept-forever retention stated) and add its row to docs/adr/README.md
-- [ ] T075 [US6] Create src/main/resources/db/migration/V5__order_idempotency.sql with `id`, `userid`, `idempotency_key`, `request_fingerprint`, `order_id`, `created_at` and `UNIQUE (userid, idempotency_key)`, per data-model.md section *Change to the schema*
-- [ ] T076 [P] [US6] Create src/main/java/com/cocos/trading/persistence/entity/OrderIdempotencyEntity.java
-- [ ] T077 [US6] Create src/main/java/com/cocos/trading/persistence/OrderIdempotencyRepository.java with `claim` as a native `INSERT … ON CONFLICT (userid, idempotency_key) DO NOTHING` returning the rows written, `findByUser(userId, key)`, and attaching the order id to the claimed row (R-210)
-- [ ] T078 [P] [US6] Create src/main/java/com/cocos/trading/service/submission/RequestFingerprint.java: the canonical form of a request and its SHA-256 as 64 hex characters, from `java.security.MessageDigest` with no new dependency (R-210)
-- [ ] T079 [P] [US6] Create src/main/java/com/cocos/trading/service/submission/IdempotencyConflictException.java (FR-029)
-- [ ] T080 [US6] Extend src/main/java/com/cocos/trading/service/submission/OrderSubmissionService.java: claim the key as the transaction's first work when one is present, replay the stored order when the claim wrote nothing and the fingerprints agree, raise the conflict when they differ, and attach the new order's id to the claimed row in the same transaction (FR-028 to FR-031, R-210)
-- [ ] T081 [US6] Read the optional `Idempotency-Key` header in src/main/java/com/cocos/trading/controller/OrderSubmissionController.java and carry it on src/main/java/com/cocos/trading/service/submission/SubmissionRequest.java — absent means "process normally" (FR-031)
-- [ ] T082 [US6] Map `IdempotencyConflictException` to `409` in src/main/java/com/cocos/trading/controller/ApiExceptionHandler.java and declare the header and the `409` answer on the operation in docs/api/openapi.yaml (FR-029, R-212, ADR-0024)
+- [X] T074 [US6] Write ADR-0037 in docs/adr/0037-idempotent-submission-with-a-caller-key.md (the header, the fingerprint and `ON CONFLICT DO NOTHING`, with the body-field, stored-body, always-`409`, fingerprint-only and expiring-key alternatives from R-210, and the kept-forever retention stated) and add its row to docs/adr/README.md
+- [X] T075 [US6] Create src/main/resources/db/migration/V5__order_idempotency.sql with `id`, `userid`, `idempotency_key`, `request_fingerprint`, `order_id`, `created_at` and `UNIQUE (userid, idempotency_key)`, per data-model.md section *Change to the schema*
+- [X] T076 [P] [US6] Create src/main/java/com/cocos/trading/persistence/entity/OrderIdempotencyEntity.java
+- [X] T077 [US6] Create src/main/java/com/cocos/trading/persistence/OrderIdempotencyRepository.java with `claim` as a native `INSERT … ON CONFLICT (userid, idempotency_key) DO NOTHING` returning the rows written, `findByUser(userId, key)`, and attaching the order id to the claimed row (R-210)
+- [X] T078 [P] [US6] Create src/main/java/com/cocos/trading/service/submission/RequestFingerprint.java: the canonical form of a request and its SHA-256 as 64 hex characters, from `java.security.MessageDigest` with no new dependency (R-210)
+- [X] T079 [P] [US6] Create src/main/java/com/cocos/trading/service/submission/IdempotencyConflictException.java (FR-029)
+- [X] T080 [US6] Extend src/main/java/com/cocos/trading/service/submission/OrderSubmissionService.java: claim the key as the transaction's first work when one is present (final step order, 2026-11-17: a non-locking existence read → the claim → the user lock only on the path that does the work, so a replay never locks; see ADR-0037), replay the stored order when the claim wrote nothing and the fingerprints agree, raise the conflict when they differ, and attach the new order's id to the claimed row in the same transaction (FR-028 to FR-031, R-210)
+- [X] T081 [US6] Read the optional `Idempotency-Key` header in src/main/java/com/cocos/trading/controller/OrderSubmissionController.java and carry it on src/main/java/com/cocos/trading/service/submission/SubmissionRequest.java — absent means "process normally" (FR-031)
+- [X] T082 [US6] Map `IdempotencyConflictException` to `409` in src/main/java/com/cocos/trading/controller/ApiExceptionHandler.java and declare the header and the `409` answer on the operation in docs/api/openapi.yaml (FR-029, R-212, ADR-0024)
 
 ### Refactor for User Story 6
 
-- [ ] T083 [US6] Refactor: with this story's tests green, review src/main/java/com/cocos/trading/service/submission/RequestFingerprint.java and OrderSubmissionService.java against constitution IX — the fingerprint having exactly one canonical form so a retry cannot hash differently from the first request, and the claim-before-the-work step order staying legible — and clean it; the tests stay green and no behaviour changes
+- [X] T083 [US6] Refactor: with this story's tests green, review src/main/java/com/cocos/trading/service/submission/RequestFingerprint.java and OrderSubmissionService.java against constitution IX — the fingerprint having exactly one canonical form so a retry cannot hash differently from the first request, and the claim-before-the-work step order staying legible — and clean it; the tests stay green and no behaviour changes
 
 **Checkpoint**: all six user stories are independently functional
 
@@ -246,13 +246,13 @@ Single-module Maven web service (plan.md, *Project Structure*): sources under `s
 
 **Purpose**: the cross-story checks, the documentation and the gate
 
-- [ ] T084 [P] Add the submission section to docs/api/trading-api.http: the four accepted paths, a refusal, a rejection and a keyed retry
-- [ ] T085 [P] Testcontainers test of quickstart scenario 13 in src/test/java/com/cocos/trading/persistence/LedgerAuditAgreementTest.java: every order this feature wrote has exactly one history row with the same status and, when rejected, the same reason; no row has a `NULL` price; `size` is `0` only on a rejection that never derived one (FR-022, R-203)
-- [ ] T086 [P] Test in src/test/java/com/cocos/trading/controller/SubmissionPortfolioAgreementTest.java that the available cash a submission validated against equals, to the cent, what the portfolio endpoint reports for the same user at the same moment, and that an order's effect is visible in the next portfolio read (FR-025, SC-012, SC-013)
-- [ ] T087 [P] Update README.md: the endpoint in the API summary, the ADR-0034 departure already stated in T002, and that the challenge statement's functional test is the e2e suite
-- [ ] T088 Run every quickstart.md scenario 1-13 against the running stack and reconcile each figure with the document, correcting whichever is wrong
-- [ ] T089 Run `./mvnw verify` and clear the whole gate: the architecture rules of T014, the `spring-javaformat` check (ADR-0019), the contract validation of every response (ADR-0024), and the Sonar quality gate (ADR-0021, ADR-0022)
-- [ ] T090 Review the refusal and rejection coverage against spec.md *Edge Cases* and confirm every path there has a test, not only the happy ones (SC-014, constitution V)
+- [X] T084 [P] Add the submission section to docs/api/trading-api.http: the four accepted paths, a refusal, a rejection and a keyed retry
+- [X] T085 [P] Testcontainers test of quickstart scenario 13 in src/test/java/com/cocos/trading/persistence/LedgerAuditAgreementTest.java: every order this feature wrote has exactly one history row with the same status and, when rejected, the same reason; no row has a `NULL` price; `size` is `0` only on a rejection that never derived one (FR-022, R-203)
+- [X] T086 [P] Test in src/test/java/com/cocos/trading/controller/SubmissionPortfolioAgreementTest.java that the available cash a submission validated against equals, to the cent, what the portfolio endpoint reports for the same user at the same moment, and that an order's effect is visible in the next portfolio read (FR-025, SC-012, SC-013)
+- [X] T087 [P] Update README.md: the endpoint in the API summary, the ADR-0034 departure already stated in T002, and that the challenge statement's functional test is the e2e suite
+- [X] T088 Run every quickstart.md scenario 1-13 against the running stack and reconcile each figure with the document, correcting whichever is wrong
+- [X] T089 Run `./mvnw verify` and clear the whole gate: the architecture rules of T014, the `spring-javaformat` check (ADR-0019), the contract validation of every response (ADR-0024), and the Sonar quality gate (ADR-0021, ADR-0022)
+- [X] T090 Review the refusal and rejection coverage against spec.md *Edge Cases* and confirm every path there has a test, not only the happy ones (SC-014, constitution V) — reviewed 2026-11-17: two edge cases had no test (a price or amount carrying more precision than money has, and a body carrying a `status` or a `cancel` flag), both now covered by src/test/java/com/cocos/trading/controller/SubmissionBodyFieldsTest.java
 
 ---
 

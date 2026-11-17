@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 import java.util.Objects;
 import java.util.Optional;
 
-
 public final class Price {
 
 	private final BigDecimal amount;
@@ -13,12 +12,10 @@ public final class Price {
 		this.amount = amount;
 	}
 
-
 	public static Price of(BigDecimal amount) {
 		return usable(amount).orElseThrow(() -> new IllegalArgumentException(
 				"A price is " + DecimalPolicy.moneyBounds() + ", and " + stated(amount) + " is not"));
 	}
-
 
 	public static Optional<Price> usable(BigDecimal amount) {
 		if (amount == null) {
@@ -32,11 +29,9 @@ public final class Price {
 		return amount;
 	}
 
-
 	public BigDecimal times(BigDecimal quantity) {
 		return quantity.multiply(amount);
 	}
-
 
 	public BigDecimal wholeSharesIn(BigDecimal money) {
 		return DecimalPolicy.wholeSharesIn(money, amount);

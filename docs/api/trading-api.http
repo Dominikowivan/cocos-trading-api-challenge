@@ -9,8 +9,12 @@
 # Response contract, enforced by the web tests (ADR-0024):
 #   docs/api/openapi.yaml
 #
-# Only the portfolio endpoint exists so far; instrument search, order submission and
-# cancellation get their own sections as those features land.
+# The portfolio, instrument search and order submission sections are below; cancellation gets
+# its own as that feature lands.
+#
+# The submission requests at the end of this file **write to the ledger**, so their figures hold
+# from the seeded state. To get back to it: docker compose down -v, then up again (the dataset is
+# a repeatable Flyway migration, ADR-0029).
 
 @host = http://localhost:8080
 @userId = 1
@@ -176,3 +180,121 @@ Accept: application/json
 # 2023-07-14. Contrast with PGR above, whose figures are null because they are unknown.
 GET {{host}}/api/v1/instruments/search?query=agro
 Accept: application/json
+
+###############################################################################
+# Order submission — POST /api/v1/users/{userId}/orders
+#
+# Every recorded outcome answers 201, FILLED, NEW and REJECTED alike, because all three appended
+# a row to the ledger (ADR-0033). A request that writes nothing answers 400, 404 or 409.
+# Expected figures: specs/003-order-placement/quickstart.md
+#
+# These requests change the account. Run them from the seeded state, in this order.
+###############################################################################
+
+### MARKET BUY by size — the exact share count (SC-001)
+# 201. status FILLED, size 100, price 925.85 (PAMP's latest close), rejectionReason null.
+# Available cash falls from 627500.00 to 534915.00: check with the portfolio request above.
+POST {{host}}/api/v1/users/{{userId}}/orders
+Content-Type: application/json
+
+{"instrumentId": 47, "type": "MARKET", "side": "BUY", "size": 100}
+
+### MARKET BUY by amount — pesos, not shares (SC-004)
+# 201. status FILLED, size 108 — floor(100000.00 / 925.85) — moving 99991.80. The unspent 8.20
+# is neither spent nor an error (FR-017). The derived size is reported on the order.
+POST {{host}}/api/v1/users/{{userId}}/orders
+Content-Type: application/json
+
+{"instrumentId": 47, "type": "MARKET", "side": "BUY", "amount": 100000.00}
+
+### LIMIT BUY by size — validated at the caller's price, never against the market (SC-006)
+# 201. status NEW, price 900.00, no fill. It reserves 90000.00 of available cash while settled
+# cash stays put, so a second order cannot commit the same pesos twice.
+POST {{host}}/api/v1/users/{{userId}}/orders
+Content-Type: application/json
+
+{"instrumentId": 47, "type": "LIMIT", "side": "BUY", "size": 100, "price": 900.00}
+
+### LIMIT SELL by amount — the price substitutes on both sides (SC-005)
+# 201. status NEW, size 30 — 30000.00 at the caller's own 1000.00 — and not the 32 the same
+# amount yields at the 925.85 close. The holding is valued at the price the caller named.
+POST {{host}}/api/v1/users/{{userId}}/orders
+Content-Type: application/json
+
+{"instrumentId": 47, "type": "LIMIT", "side": "SELL", "amount": 30000.00, "price": 1000.00}
+
+### A recorded rejection — the user cannot pay for it (FR-019, SC-002)
+# 201 with status REJECTED and rejectionReason INSUFFICIENT_FUNDS. The order **is** stored, with
+# its price and its requested size, and no figure in the portfolio moves.
+POST {{host}}/api/v1/users/{{userId}}/orders
+Content-Type: application/json
+
+{"instrumentId": 47, "type": "MARKET", "side": "BUY", "size": 1000}
+
+### A refusal — a MARKET order for an instrument that does not quote (SC-009, ADR-0034)
+# 400 application/problem+json, detail "Instrument 3 (PGR) has no market price, so a MARKET order
+# has no execution price". Nothing is written. This is the one departure from the challenge
+# statement, and the README says so.
+POST {{host}}/api/v1/users/{{userId}}/orders
+Content-Type: application/json
+
+{"instrumentId": 3, "type": "MARKET", "side": "BUY", "size": 1}
+
+### The same instrument as a LIMIT order is accepted (FR-011)
+# 201 with status NEW. Naming your own price is the honest request for something the market has
+# not priced; a limit order never reads market data.
+POST {{host}}/api/v1/users/{{userId}}/orders
+Content-Type: application/json
+
+{"instrumentId": 3, "type": "LIMIT", "side": "BUY", "size": 1, "price": 100.00}
+
+### A refusal — a MARKET order carrying a price (FR-005)
+# 400, detail "A MARKET order executes at the latest close and takes no price". Refused, never
+# silently ignored.
+POST {{host}}/api/v1/users/{{userId}}/orders
+Content-Type: application/json
+
+{"instrumentId": 47, "type": "MARKET", "side": "BUY", "size": 10, "price": 900.00}
+
+### A refusal — an unknown user (FR-007)
+# 404, detail "User 99999 does not exist". The target of the request is a user's order collection.
+POST {{host}}/api/v1/users/99999/orders
+Content-Type: application/json
+
+{"instrumentId": 47, "type": "MARKET", "side": "BUY", "size": 1}
+
+### An idempotent submission — the first request with a key (SC-011, FR-028)
+# 201. Note the orderId: the next request returns this same one.
+POST {{host}}/api/v1/users/{{userId}}/orders
+Content-Type: application/json
+Idempotency-Key: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+
+{"instrumentId": 47, "type": "MARKET", "side": "BUY", "size": 5}
+
+### The same request again with the same key — the retry, not a second order
+# 201 with the **same** orderId, status and submittedAt as above, and one order in the ledger:
+# the portfolio shows the cash moved once. Whitespace and key order do not matter — the
+# fingerprint is taken over the parsed request (ADR-0037).
+POST {{host}}/api/v1/users/{{userId}}/orders
+Content-Type: application/json
+Idempotency-Key: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+
+{  "side" : "BUY", "type":"MARKET",   "size": 5.00, "instrumentId" : 47 }
+
+### The same key with a different body — a conflict
+# 409 application/problem+json: the key already names a different request for this user (FR-029).
+# Nothing is written, and the earlier order is not disclosed.
+POST {{host}}/api/v1/users/{{userId}}/orders
+Content-Type: application/json
+Idempotency-Key: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+
+{"instrumentId": 47, "type": "MARKET", "side": "BUY", "size": 7}
+
+### The same key sent by another user — a new request (FR-030)
+# 201. Keys are scoped per user, so this is processed on its own merits: user 2 has never traded,
+# so it is a recorded REJECTED / INSUFFICIENT_FUNDS.
+POST {{host}}/api/v1/users/2/orders
+Content-Type: application/json
+Idempotency-Key: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+
+{"instrumentId": 47, "type": "MARKET", "side": "BUY", "size": 1}

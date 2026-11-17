@@ -17,6 +17,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 
 import com.cocos.trading.model.user.UnknownUserException;
 import com.cocos.trading.service.search.InvalidSearchRequestException;
+import com.cocos.trading.service.submission.IdempotencyConflictException;
 import com.cocos.trading.service.submission.InvalidSubmissionException;
 
 @RestControllerAdvice
@@ -38,6 +39,11 @@ class ApiExceptionHandler {
 	@ExceptionHandler(InvalidSubmissionException.class)
 	ProblemDetail invalidSubmission(InvalidSubmissionException exception) {
 		return problem(HttpStatus.BAD_REQUEST, exception.getMessage());
+	}
+
+	@ExceptionHandler(IdempotencyConflictException.class)
+	ProblemDetail idempotencyConflict(IdempotencyConflictException exception) {
+		return problem(HttpStatus.CONFLICT, exception.getMessage());
 	}
 
 	@ExceptionHandler(HttpMessageNotReadableException.class)

@@ -45,3 +45,5 @@ currently holds; the journal is the authority on how it was reached.**
 | [0033](0033-the-submission-endpoint-shape.md) | One submission endpoint under the user, where every recorded outcome is a `201` | Accepted |
 | [0034](0034-an-unpriced-instrument-refuses-the-submission.md) | An instrument with no price refuses the submission; it is not a recorded rejection — **a departure from the statement** | Accepted |
 | [0035](0035-a-price-is-a-type-and-only-a-priced-submission-decides.md) | A price is a type, and only a priced submission can decide | Accepted |
+| [0036](0036-submissions-are-serialised-per-user.md) | Submissions are serialised per user by a pessimistic lock on their `users` row | Accepted |
+| [0037](0037-idempotent-submission-with-a-caller-key.md) | An idempotent submission is a caller key, a fingerprint and `INSERT … ON CONFLICT DO NOTHING` | Accepted |

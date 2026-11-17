@@ -142,7 +142,7 @@ market's `925.85` (SC-005).
 
 | Element | Contract |
 |---|---|
-| `OrderSubmissionService` | One method, one transaction, **`READ COMMITTED`** ([R-211](research.md#r-211-the-transaction-is-read-committed-deliberately-unlike-the-reads)), not read-only. It orchestrates and decides nothing: claim the key if there is one → lock the user → read the ledger and the latest close → let the model decide → append the order and its history row → attach the order to the key → return what happened |
+| `OrderSubmissionService` | One method, one transaction, **`READ COMMITTED`** ([R-211](research.md#r-211-the-transaction-is-read-committed-deliberately-unlike-the-reads)), not read-only. It orchestrates and decides nothing: check the user exists (a non-locking read on the primary key) → claim the key if there is one → lock the user → read the ledger and the latest close → let the model decide → append the order and its history row → attach the order to the key → return what happened. A claim that wrote nothing skips straight to the replay and never takes the lock ([ADR-0037](../../docs/adr/0037-idempotent-submission-with-a-caller-key.md)) |
 | `SubmissionRequest` | What the controller hands over, raw: the user id, the instrument id, the type and side as text, the size, the amount, the price, and the key. Nothing is validated yet — validating it against the rules is the use case's job (constitution VIII) |
 | `SubmittedOrder` | What the controller gets back: the order's id, its user and instrument, side, type, status, size, price, reason and instant. No DTO reaches this signature |
 | `InvalidSubmissionException` | The one refusal that writes nothing, naming the rule it broke and the allowed values — `400` ([R-212](research.md#r-212-the-error-map-400-404-409-503)) |
@@ -151,10 +151,12 @@ market's `925.85` (SC-005).
 | `RequestFingerprint` | The canonical form of a request and its SHA-256, in one place, so the hash a retry computes cannot drift from the hash the first request stored |
 
 **The order of the steps is itself a rule**: the key is claimed before any work, so a retry that
-blocks on the unique index holds no row lock; the user lock is taken before the ledger is read, so the
-figures the decision uses cannot move under it; and the order, the history row and the key's
-`order_id` are written in the one transaction, so a rollback leaves no trace and a retry of a
-rolled-back request is a first request again.
+blocks on the unique index holds no row lock and a replay never takes one; the user's existence is
+read before the claim, because the claim's `userid` is a foreign key and an unknown user must still
+be a `404`; the user lock is taken before the ledger is read, so the figures the decision uses cannot
+move under it; and the order, the history row and the key's `order_id` are written in the one
+transaction, so a rollback leaves no trace and a retry of a rolled-back request is a first request
+again.
 
 ## 5. Controller
 

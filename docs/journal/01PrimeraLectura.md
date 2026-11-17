@@ -257,7 +257,7 @@ Cada orden que ponemos con el POST de order debería ser NEW/FILLED (dependiendo
 Dado esto, pienso que es mejor tener un endpoint aparte para cancelar una orden.
 
 ## Próximos agregados y pendientes para no olvidarme
-
+  
 - ArchUnit.
 - Constraints.
 - Índices.

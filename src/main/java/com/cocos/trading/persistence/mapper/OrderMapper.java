@@ -3,7 +3,9 @@ package com.cocos.trading.persistence.mapper;
 import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
+import com.cocos.trading.model.Price;
 import com.cocos.trading.model.order.CashMovement;
 import com.cocos.trading.model.order.LedgerSide;
 import com.cocos.trading.model.order.NewOrder;
@@ -12,6 +14,7 @@ import com.cocos.trading.model.order.OrderKind;
 import com.cocos.trading.model.order.OrderSide;
 import com.cocos.trading.model.order.OrderStatus;
 import com.cocos.trading.model.order.RejectionReason;
+import com.cocos.trading.model.user.UserId;
 import com.cocos.trading.persistence.entity.OrderEntity;
 import com.cocos.trading.persistence.entity.OrderStatusHistoryEntity;
 
@@ -32,6 +35,13 @@ public final class OrderMapper {
 		return OrderEntity.newOrder(toUserIdColumn(order), toInstrumentIdColumn(order), toSizeColumn(order),
 				order.price().amount(), order.side().name(), order.status().name(), order.kind().name(),
 				order.occurredAt());
+	}
+
+	public static NewOrder toPlacedOrder(OrderEntity order) {
+		return new NewOrder(new UserId(order.getUserId()), InstrumentMapper.toInstrumentRef(order.getInstrument()),
+				OrderSide.valueOf(order.getSide()), OrderKind.valueOf(order.getType()),
+				OrderStatus.valueOf(order.getStatus()), BigDecimal.valueOf(order.getSize()), Price.of(order.getPrice()),
+				Optional.empty(), order.getDatetime());
 	}
 
 	public static OrderStatusHistoryEntity toNewTransition(Integer orderId, NewOrder order) {
