@@ -13,7 +13,7 @@ class ConcurrentIdempotentSubmissionTest extends SubmissionWebTestBase {
 	private static final String ONE_HUNDRED_PAMP = marketOrderOf(PAMP, "BUY", sizeOf(100));
 
 	@RepeatedTest(5)
-	void two_requests_with_the_same_key_at_the_same_instant_yield_one_order() throws Exception {
+	void two_requests_with_the_same_key_at_the_same_instant_yield_one_order() {
 		long before = ordersInTheLedger();
 
 		List<String> outcomes = Simultaneously.theseTwo(
@@ -26,7 +26,7 @@ class ConcurrentIdempotentSubmissionTest extends SubmissionWebTestBase {
 	}
 
 	@RepeatedTest(3)
-	void the_loser_returns_the_committed_outcome_of_a_rejection_too() throws Exception {
+	void the_loser_returns_the_committed_outcome_of_a_rejection_too() {
 		String unaffordable = marketOrderOf(PAMP, "BUY", sizeOf(1000));
 		long before = ordersInTheLedger();
 

@@ -26,26 +26,23 @@ final class RequestedSubmission {
 
 	private final BigDecimal limitPrice;
 
-	private final IdempotencyKey key;
-
-	private final RequestFingerprint fingerprint;
+	private final IdempotentRequest idempotent;
 
 	private RequestedSubmission(UserId userId, Integer instrumentIdColumn, OrderKind kind, OrderSide side,
-			TradeQuantity quantity, BigDecimal limitPrice, IdempotencyKey key, RequestFingerprint fingerprint) {
+			TradeQuantity quantity, BigDecimal limitPrice, IdempotentRequest idempotent) {
 		this.userId = userId;
 		this.instrumentIdColumn = instrumentIdColumn;
 		this.kind = kind;
 		this.side = side;
 		this.quantity = quantity;
 		this.limitPrice = limitPrice;
-		this.key = key;
-		this.fingerprint = fingerprint;
+		this.idempotent = idempotent;
 	}
 
 	static RequestedSubmission read(SubmissionRequest request) {
 		return new RequestedSubmission(new UserId(request.userId()), instrumentIdColumnOf(request.instrumentId()),
 				kindOf(request.type()), sideOf(request.side()), quantityOf(request), request.price(),
-				keyOf(request.idempotencyKey()), RequestFingerprint.of(request));
+				idempotentOf(request));
 	}
 
 	UserId userId() {
@@ -56,12 +53,8 @@ final class RequestedSubmission {
 		return instrumentIdColumn;
 	}
 
-	Optional<IdempotencyKey> idempotencyKey() {
-		return Optional.ofNullable(key);
-	}
-
-	RequestFingerprint fingerprint() {
-		return fingerprint;
+	Optional<IdempotentRequest> idempotent() {
+		return Optional.ofNullable(idempotent);
 	}
 
 	Submission tradedAs(InstrumentRef instrument) {
@@ -106,8 +99,8 @@ final class RequestedSubmission {
 		return refusing(() -> TradeQuantity.of(request.size(), request.amount()));
 	}
 
-	private static IdempotencyKey keyOf(String key) {
-		return key == null ? null : refusing(() -> new IdempotencyKey(key));
+	private static IdempotentRequest idempotentOf(SubmissionRequest request) {
+		return request.idempotencyKey() == null ? null : IdempotentRequest.of(request);
 	}
 
 }

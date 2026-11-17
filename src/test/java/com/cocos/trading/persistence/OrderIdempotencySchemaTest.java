@@ -37,9 +37,10 @@ class OrderIdempotencySchemaTest extends PersistenceTestBase {
 
 	@Test
 	void the_same_key_cannot_be_claimed_twice_by_one_user() {
-		jdbcTemplate.update(claimOf(SEEDED_USER, "'twice'", "NULL"));
+		String theSameKeyAgain = claimOf(SEEDED_USER, "'twice'", "NULL");
+		jdbcTemplate.update(theSameKeyAgain);
 
-		assertThatThrownBy(() -> jdbcTemplate.execute(claimOf(SEEDED_USER, "'twice'", "NULL")))
+		assertThatThrownBy(() -> jdbcTemplate.execute(theSameKeyAgain))
 			.isInstanceOf(DataIntegrityViolationException.class);
 	}
 
@@ -57,13 +58,17 @@ class OrderIdempotencySchemaTest extends PersistenceTestBase {
 
 	@Test
 	void a_claim_for_a_user_that_does_not_exist_is_refused() {
-		assertThatThrownBy(() -> jdbcTemplate.execute(claimOf("999999", "'orphan'", "NULL")))
+		String forAUserThatDoesNotExist = claimOf("999999", "'orphan'", "NULL");
+
+		assertThatThrownBy(() -> jdbcTemplate.execute(forAUserThatDoesNotExist))
 			.isInstanceOf(DataIntegrityViolationException.class);
 	}
 
 	@Test
 	void a_claim_naming_an_order_that_does_not_exist_is_refused() {
-		assertThatThrownBy(() -> jdbcTemplate.execute(claimOf(SEEDED_USER, "'phantom'", "999999")))
+		String namingAnOrderThatDoesNotExist = claimOf(SEEDED_USER, "'phantom'", "999999");
+
+		assertThatThrownBy(() -> jdbcTemplate.execute(namingAnOrderThatDoesNotExist))
 			.isInstanceOf(DataIntegrityViolationException.class);
 	}
 

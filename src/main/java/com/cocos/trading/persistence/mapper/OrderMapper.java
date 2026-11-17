@@ -32,9 +32,15 @@ public final class OrderMapper {
 	}
 
 	public static OrderEntity toNewOrder(NewOrder order) {
-		return OrderEntity.newOrder(toUserIdColumn(order), toInstrumentIdColumn(order), toSizeColumn(order),
-				order.price().amount(), order.side().name(), order.status().name(), order.kind().name(),
-				order.occurredAt());
+		return OrderEntity.newOrder()
+			.ofUser(toUserIdColumn(order))
+			.inInstrument(toInstrumentIdColumn(order))
+			.ofSize(toSizeColumn(order))
+			.atPrice(order.price().amount())
+			.onSide(order.side().name())
+			.withStatus(order.status().name())
+			.ofType(order.kind().name())
+			.placedAt(order.occurredAt());
 	}
 
 	public static NewOrder toPlacedOrder(OrderEntity order) {

@@ -41,8 +41,9 @@ class OrderStatusHistorySchemaTest extends PersistenceTestBase {
 
 	@Test
 	void a_transition_of_an_order_that_does_not_exist_is_refused() {
-		assertThatThrownBy(
-				() -> jdbcTemplate.execute(transitionOf("999999", "'FILLED'", "NULL", "'2026-11-17 10:00:00'")))
+		String ofAnOrderThatDoesNotExist = transitionOf("999999", "'FILLED'", "NULL", "'2026-11-17 10:00:00'");
+
+		assertThatThrownBy(() -> jdbcTemplate.execute(ofAnOrderThatDoesNotExist))
 			.isInstanceOf(DataIntegrityViolationException.class);
 	}
 

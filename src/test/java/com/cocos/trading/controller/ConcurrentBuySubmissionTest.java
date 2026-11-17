@@ -17,7 +17,7 @@ class ConcurrentBuySubmissionTest extends SubmissionWebTestBase {
 	private static final String ONE_HUNDRED_PAMP = marketOrderOf(PAMP, "BUY", sizeOf(100));
 
 	@RepeatedTest(5)
-	void two_purchases_that_cannot_both_be_paid_for_fill_exactly_one() throws Exception {
+	void two_purchases_that_cannot_both_be_paid_for_fill_exactly_one() {
 		long before = ordersInTheLedger();
 
 		List<String> outcomes = outcomesOf(SEEDED_USER, FOUR_HUNDRED_PAMP, SEEDED_USER, FOUR_HUNDRED_PAMP);
