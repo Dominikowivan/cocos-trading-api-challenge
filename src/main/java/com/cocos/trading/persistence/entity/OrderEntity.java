@@ -6,6 +6,8 @@ import java.time.LocalDateTime;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
@@ -16,6 +18,7 @@ import jakarta.persistence.Table;
 public class OrderEntity {
 
 	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(name = "id")
 	private Integer id;
 
@@ -23,8 +26,11 @@ public class OrderEntity {
 	private Integer userId;
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "instrumentid")
+	@JoinColumn(name = "instrumentid", insertable = false, updatable = false)
 	private InstrumentEntity instrument;
+
+	@Column(name = "instrumentid")
+	private Integer instrumentId;
 
 	@Column(name = "size")
 	private int size;
@@ -45,6 +51,20 @@ public class OrderEntity {
 	private LocalDateTime datetime;
 
 	protected OrderEntity() {
+	}
+
+	public static OrderEntity newOrder(Integer userId, Integer instrumentId, int size, BigDecimal price, String side,
+			String status, String type, LocalDateTime datetime) {
+		OrderEntity order = new OrderEntity();
+		order.userId = userId;
+		order.instrumentId = instrumentId;
+		order.size = size;
+		order.price = price;
+		order.side = side;
+		order.status = status;
+		order.type = type;
+		order.datetime = datetime;
+		return order;
 	}
 
 	public Integer getId() {

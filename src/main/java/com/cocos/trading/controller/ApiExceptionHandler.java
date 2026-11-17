@@ -7,6 +7,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.transaction.TransactionTimedOutException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -14,8 +15,9 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
+import com.cocos.trading.model.user.UnknownUserException;
 import com.cocos.trading.service.search.InvalidSearchRequestException;
-import com.cocos.trading.service.portfolio.UnknownUserException;
+import com.cocos.trading.service.submission.InvalidSubmissionException;
 
 @RestControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -31,6 +33,17 @@ class ApiExceptionHandler {
 	@ExceptionHandler(InvalidSearchRequestException.class)
 	ProblemDetail invalidSearchRequest(InvalidSearchRequestException exception) {
 		return problem(HttpStatus.BAD_REQUEST, exception.getMessage());
+	}
+
+	@ExceptionHandler(InvalidSubmissionException.class)
+	ProblemDetail invalidSubmission(InvalidSubmissionException exception) {
+		return problem(HttpStatus.BAD_REQUEST, exception.getMessage());
+	}
+
+	@ExceptionHandler(HttpMessageNotReadableException.class)
+	ProblemDetail malformedBody(HttpMessageNotReadableException exception) {
+		log.debug("unreadable request body: {}", exception.getMessage());
+		return problem(HttpStatus.BAD_REQUEST, "The request body is not a readable order submission");
 	}
 
 	@ExceptionHandler(MissingServletRequestParameterException.class)

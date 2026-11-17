@@ -2,7 +2,9 @@ package com.cocos.trading.model.order;
 
 import java.math.BigDecimal;
 
-public enum OrderSide {
+import com.cocos.trading.model.Price;
+
+public enum OrderSide implements LedgerSide {
 
 	BUY {
 		@Override
@@ -13,6 +15,16 @@ public enum OrderSide {
 		@Override
 		public BigDecimal positionSign() {
 			return INCREASE;
+		}
+
+		@Override
+		public BigDecimal committableValue(AvailableBalance available, Price price) {
+			return available.cash();
+		}
+
+		@Override
+		public RejectionReason whatRanOut() {
+			return RejectionReason.INSUFFICIENT_FUNDS;
 		}
 	},
 
@@ -26,42 +38,24 @@ public enum OrderSide {
 		public BigDecimal positionSign() {
 			return DECREASE;
 		}
-	},
 
-	CASH_IN {
 		@Override
-		public BigDecimal cashSign() {
-			return INFLOW;
+		public BigDecimal committableValue(AvailableBalance available, Price price) {
+			return price.times(available.shares());
 		}
 
 		@Override
-		public BigDecimal positionSign() {
-			throw new UnsupportedOperationException(name() + " moves cash, never a position");
-		}
-	},
-
-	CASH_OUT {
-		@Override
-		public BigDecimal cashSign() {
-			return OUTFLOW;
-		}
-
-		@Override
-		public BigDecimal positionSign() {
-			throw new UnsupportedOperationException(name() + " moves cash, never a position");
+		public RejectionReason whatRanOut() {
+			return RejectionReason.INSUFFICIENT_HOLDINGS;
 		}
 	};
-
-	private static final BigDecimal INFLOW = BigDecimal.ONE;
-
-	private static final BigDecimal OUTFLOW = BigDecimal.ONE.negate();
 
 	private static final BigDecimal INCREASE = BigDecimal.ONE;
 
 	private static final BigDecimal DECREASE = BigDecimal.ONE.negate();
 
-	public abstract BigDecimal cashSign();
+	public abstract BigDecimal committableValue(AvailableBalance available, Price price);
 
-	public abstract BigDecimal positionSign();
+	public abstract RejectionReason whatRanOut();
 
 }

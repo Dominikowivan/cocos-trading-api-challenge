@@ -4,13 +4,16 @@ import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.List;
 
-import com.cocos.trading.model.instrument.InstrumentRef;
+import com.cocos.trading.model.order.CashMovement;
+import com.cocos.trading.model.order.LedgerSide;
+import com.cocos.trading.model.order.NewOrder;
 import com.cocos.trading.model.order.Order;
 import com.cocos.trading.model.order.OrderKind;
 import com.cocos.trading.model.order.OrderSide;
 import com.cocos.trading.model.order.OrderStatus;
-import com.cocos.trading.persistence.entity.InstrumentEntity;
+import com.cocos.trading.model.order.RejectionReason;
 import com.cocos.trading.persistence.entity.OrderEntity;
+import com.cocos.trading.persistence.entity.OrderStatusHistoryEntity;
 
 public final class OrderMapper {
 
@@ -25,15 +28,47 @@ public final class OrderMapper {
 		return statuses.stream().map(Enum::name).toList();
 	}
 
-	private static Order toOrder(OrderEntity order) {
-		return new Order(order.getId(), toInstrumentRef(order.getInstrument()), OrderSide.valueOf(order.getSide()),
-				OrderStatus.valueOf(order.getStatus()), OrderKind.valueOf(order.getType()),
-				BigDecimal.valueOf(order.getSize()), order.getPrice(), order.getDatetime());
+	public static OrderEntity toNewOrder(NewOrder order) {
+		return OrderEntity.newOrder(toUserIdColumn(order), toInstrumentIdColumn(order), toSizeColumn(order),
+				order.price().amount(), order.side().name(), order.status().name(), order.kind().name(),
+				order.occurredAt());
 	}
 
-	private static InstrumentRef toInstrumentRef(InstrumentEntity instrument) {
-		return new InstrumentRef(instrument.getId(), instrument.getTicker(), instrument.getName(),
-				instrument.getType());
+	public static OrderStatusHistoryEntity toNewTransition(Integer orderId, NewOrder order) {
+		return OrderStatusHistoryEntity.newTransition(orderId, order.status().name(), toReasonColumn(order),
+				order.occurredAt());
+	}
+
+	private static Order toOrder(OrderEntity order) {
+		return new Order(order.getId(), InstrumentMapper.toInstrumentRef(order.getInstrument()),
+				toLedgerSide(order.getSide()), OrderStatus.valueOf(order.getStatus()),
+				OrderKind.valueOf(order.getType()), BigDecimal.valueOf(order.getSize()), order.getPrice(),
+				order.getDatetime());
+	}
+
+	private static LedgerSide toLedgerSide(String side) {
+		for (CashMovement movement : CashMovement.values()) {
+			if (movement.name().equals(side)) {
+				return movement;
+			}
+		}
+		return OrderSide.valueOf(side);
+	}
+
+	private static Integer toUserIdColumn(NewOrder order) {
+		return Math.toIntExact(order.userId().value());
+	}
+
+	private static Integer toInstrumentIdColumn(NewOrder order) {
+		return Math.toIntExact(order.instrument().instrumentId());
+	}
+
+	private static int toSizeColumn(NewOrder order) {
+		return order.size().intValueExact();
+	}
+
+	private static String toReasonColumn(NewOrder order) {
+		return order.rejectionReason().map(RejectionReason::name).orElse(null);
 	}
 
 }

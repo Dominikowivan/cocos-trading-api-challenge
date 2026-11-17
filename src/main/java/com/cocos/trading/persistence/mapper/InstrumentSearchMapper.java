@@ -11,12 +11,7 @@ public final class InstrumentSearchMapper {
 	}
 
 	public static Page<InstrumentRef> toInstrumentRefs(Page<InstrumentEntity> instruments) {
-		return instruments.map(InstrumentSearchMapper::toInstrumentRef);
-	}
-
-	private static InstrumentRef toInstrumentRef(InstrumentEntity instrument) {
-		return new InstrumentRef(instrument.getId(), instrument.getTicker(), instrument.getName(),
-				instrument.getType());
+		return instruments.map(InstrumentMapper::toInstrumentRef);
 	}
 
 }

@@ -42,3 +42,6 @@ currently holds; the journal is the authority on how it was reached.**
 | [0030](0030-the-schema-requires-columns-not-business-rules.md) | The schema requires the columns the code cannot read without, and nothing more | Accepted |
 | [0031](0031-database-access-has-a-deadline-and-a-bounded-pool.md) | Database access has a deadline and a bounded pool, and running out of either is a 503 | Accepted |
 | [0032](0032-paging-is-spring-datas-pageable.md) | Paging is Spring Data's `Pageable`, and out-of-range values are adjusted, not rejected | Accepted |
+| [0033](0033-the-submission-endpoint-shape.md) | One submission endpoint under the user, where every recorded outcome is a `201` | Accepted |
+| [0034](0034-an-unpriced-instrument-refuses-the-submission.md) | An instrument with no price refuses the submission; it is not a recorded rejection — **a departure from the statement** | Accepted |
+| [0035](0035-a-price-is-a-type-and-only-a-priced-submission-decides.md) | A price is a type, and only a priced submission can decide | Accepted |

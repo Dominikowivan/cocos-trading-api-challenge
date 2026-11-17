@@ -9,7 +9,7 @@ import java.util.stream.Collectors;
 
 import com.cocos.trading.model.instrument.DailyClose;
 import com.cocos.trading.model.instrument.DailyCloses;
-import com.cocos.trading.model.portfolio.Closes;
+import com.cocos.trading.model.instrument.Closes;
 import com.cocos.trading.persistence.LatestMarketData;
 
 public final class MarketDataMapper {

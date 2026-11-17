@@ -142,8 +142,20 @@ The build fails on unformatted code. To format it:
 |---|---|---|
 | `GET` | `/api/v1/users/{userId}/portfolio` | Total account value, cash available to trade, and one entry per position with quantity, market value and total return |
 | `GET` | `/api/v1/instruments/search?query={text}` | One page of the instruments matching the text by ticker or name — partial and case-insensitive, ordered by ticker, never pesos (cash is not a tradable asset), each carrying its latest close and the day's move. Accents must be typed as they are stored: `río` finds *Molinos Río de la Plata*, `rio` does not (3 of 66 names; their tickers always match; `unaccent` considered and deferred, ADR-0027). Optional `page` and `size` |
-| `POST` | `/api/v1/orders` | Submits an order. `MARKET` fills immediately at the last close; `LIMIT` is accepted as `NEW` |
-| `POST` | `/api/v1/orders/{orderId}/cancel` | Cancels an order that is still `NEW` |
+| `POST` | `/api/v1/users/{userId}/orders` | Submits one order. `MARKET` fills immediately at the last close; `LIMIT` is accepted as `NEW`. An order the user cannot pay for, or whose shares they do not hold, is **stored** `REJECTED` with a machine-readable reason and answered `201`, like the other two: a rejection is a recorded outcome, a malformed request is not (ADR-0033) |
+| `POST` | `/api/v1/users/{userId}/orders/{orderId}/cancel` | Cancels an order that is still `NEW` |
+
+## One departure from the statement
+
+**A `MARKET` order for an instrument with no published price is refused with `400` and nothing is
+written, instead of being stored as a `REJECTED` order** ([ADR-0034](docs/adr/0034-an-unpriced-instrument-refuses-the-submission.md)).
+Three instruments in the provided dataset have no `marketdata` row (`PGR`, `IRCP`, and `ARS`, which
+is cash and refused anyway), and a `MARKET` order for one of them has no execution price to record.
+An instrument that does not quote is a property of the request, knowable before any of the user's
+money is considered — so refusing it keeps every row in `orders` priced and never writes a money
+figure as `0` when it is unknown ([ADR-0013](docs/adr/0013-unknown-money-is-absent-never-zero.md)).
+Every other rejection the statement asks for is stored. A `LIMIT` order for the same instrument is
+accepted: its price came in the request.
 
 ## Two things this API deliberately does not do
 
