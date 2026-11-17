@@ -25,7 +25,7 @@ public class IdempotentWrite {
 		this.clock = clock;
 	}
 
-	public <T extends AppendedOrder> T once(UserId userId, KeyedRequest request, Supplier<T> work,
+	public <T extends WrittenOrder> T once(UserId userId, KeyedRequest request, Supplier<T> work,
 			IntFunction<T> replay) {
 		CallersTransaction
 			.require("An idempotency claim runs inside the use case's transaction, so a refused request rolls it back");
@@ -41,12 +41,12 @@ public class IdempotentWrite {
 		return orderIdempotencyRepository.claim(userIdColumn, request.keyValue(), request.fingerprintHex(), now());
 	}
 
-	private <T extends AppendedOrder> T attachedTo(KeyedRequest request, Integer userIdColumn, T order) {
+	private <T extends WrittenOrder> T attachedTo(KeyedRequest request, Integer userIdColumn, T order) {
 		orderIdempotencyRepository.attachOrderTo(userIdColumn, request.keyValue(), Math.toIntExact(order.orderId()));
 		return order;
 	}
 
-	private <T extends AppendedOrder> T theOutcomeAlreadyRecordedFor(KeyedRequest request, Integer userIdColumn,
+	private <T extends WrittenOrder> T theOutcomeAlreadyRecordedFor(KeyedRequest request, Integer userIdColumn,
 			IntFunction<T> replay) {
 		if (!request.wasSentBefore(recordedFingerprintOf(request, userIdColumn))) {
 			throw new IdempotencyConflictException(request.keyValue());

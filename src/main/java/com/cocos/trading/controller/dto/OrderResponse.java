@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import com.cocos.trading.model.order.RejectionReason;
+import com.cocos.trading.service.cancellation.CancelledOrder;
 import com.cocos.trading.service.submission.SubmittedOrder;
 
 public record OrderResponse(long orderId, long userId, long instrumentId, String ticker, String type, String side,
@@ -14,6 +15,12 @@ public record OrderResponse(long orderId, long userId, long instrumentId, String
 				order.instrument().ticker(), order.kind().name(), order.side().name(), order.status().name(),
 				order.size().intValueExact(), order.price(),
 				order.rejectionReason().map(RejectionReason::name).orElse(null), order.submittedAt());
+	}
+
+	public static OrderResponse of(CancelledOrder order) {
+		return new OrderResponse(order.orderId(), order.userId().value(), order.instrument().instrumentId(),
+				order.instrument().ticker(), order.kind().name(), order.side().name(), order.status().name(),
+				order.size().intValueExact(), order.price(), null, order.submittedAt());
 	}
 
 }

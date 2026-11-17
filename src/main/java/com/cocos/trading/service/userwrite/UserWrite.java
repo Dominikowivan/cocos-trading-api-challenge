@@ -26,7 +26,7 @@ public class UserWrite {
 		this.userLock = userLock;
 	}
 
-	public <T extends AppendedOrder> T write(UserId userId, Optional<KeyedRequest> keyed, IntFunction<T> work,
+	public <T extends WrittenOrder> T write(UserId userId, Optional<KeyedRequest> keyed, IntFunction<T> work,
 			IntFunction<T> replay) {
 		requireAnExistingUser(userId);
 		Supplier<T> lockedWork = () -> userLock.underTheLockOf(userId, work);

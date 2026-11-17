@@ -11,11 +11,11 @@ import com.cocos.trading.model.order.OrderKind;
 import com.cocos.trading.model.order.OrderStatus;
 import com.cocos.trading.model.order.RejectionReason;
 import com.cocos.trading.model.user.UserId;
-import com.cocos.trading.service.userwrite.AppendedOrder;
+import com.cocos.trading.service.userwrite.WrittenOrder;
 
 public record SubmittedOrder(long orderId, UserId userId, InstrumentRef instrument, LedgerSide side, OrderKind kind,
 		OrderStatus status, BigDecimal size, BigDecimal price, Optional<RejectionReason> rejectionReason,
-		LocalDateTime submittedAt) implements AppendedOrder {
+		LocalDateTime submittedAt) implements WrittenOrder {
 
 	public static SubmittedOrder of(long orderId, NewOrder order) {
 		return new SubmittedOrder(orderId, order.userId(), order.instrument(), order.side(), order.kind(),

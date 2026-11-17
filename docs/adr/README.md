@@ -15,7 +15,7 @@ currently holds; the journal is the authority on how it was reached.**
 | [0003](0003-weighted-average-cost.md) | Weighted average cost for positions, not FIFO | Accepted |
 | [0004](0004-reserve-funds-on-new-orders.md) | `NEW` limit orders reserve funds and holdings | Accepted |
 | [0005](0005-order-status-history.md) | An append-only `order_status_history` table | Accepted |
-| [0006](0006-dedicated-cancel-endpoint.md) | A dedicated endpoint for cancelling an order | Accepted |
+| [0006](0006-dedicated-cancel-endpoint.md) | A dedicated endpoint for cancelling an order | Superseded by [0041](0041-the-order-cancellation-endpoint-shape.md) |
 | [0007](0007-out-of-scope-matching-engine-and-auth.md) | No matching engine and no authentication | Accepted |
 | [0008](0008-spec-kit-tooling-versioned.md) | The agent tooling is versioned with the project | Accepted |
 | [0009](0009-flyway-and-provided-database-as-staging.md) | Flyway, and the provided database treated as staging | Accepted |
@@ -50,3 +50,6 @@ currently holds; the journal is the authority on how it was reached.**
 | [0038](0038-the-cash-transfer-endpoint-shape.md) | One cash transfer endpoint under the user, with its own response and a closed body | Accepted |
 | [0039](0039-a-transfer-is-a-market-order-on-the-cash-instrument.md) | A transfer is a `MARKET` order on the `MONEDA` instrument at price `1`, in whole pesos | Accepted |
 | [0040](0040-per-user-write-protection-lives-once.md) | The per-user write protection lives once, in `service/userwrite` | Accepted |
+| [0041](0041-the-order-cancellation-endpoint-shape.md) | Cancellation is `POST …/users/{userId}/orders/{orderId}/cancel`, answering the order | Accepted |
+| [0042](0042-the-history-reason-says-why-the-order-moved.md) | The history's `reason` says why the order moved, not only why it was rejected | Accepted |
+| [0043](0043-a-replay-answers-the-outcome-as-first-recorded.md) | An idempotent replay answers the outcome as first recorded | Accepted |

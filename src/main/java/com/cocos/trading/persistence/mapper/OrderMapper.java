@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Optional;
 
 import com.cocos.trading.model.Price;
+import com.cocos.trading.model.order.CancellationDecision;
+import com.cocos.trading.model.order.CancellationReason;
 import com.cocos.trading.model.order.CashMovement;
 import com.cocos.trading.model.order.LedgerSide;
 import com.cocos.trading.model.order.NewOrder;
@@ -13,6 +15,7 @@ import com.cocos.trading.model.order.Order;
 import com.cocos.trading.model.order.OrderKind;
 import com.cocos.trading.model.order.OrderSide;
 import com.cocos.trading.model.order.OrderStatus;
+import com.cocos.trading.model.order.RecordedTransition;
 import com.cocos.trading.model.order.RejectionReason;
 import com.cocos.trading.model.user.UserId;
 import com.cocos.trading.persistence.entity.OrderEntity;
@@ -55,6 +58,25 @@ public final class OrderMapper {
 				order.occurredAt());
 	}
 
+	public static Optional<Integer> toIdColumn(long orderId) {
+		if (orderId < Integer.MIN_VALUE || orderId > Integer.MAX_VALUE) {
+			return Optional.empty();
+		}
+		return Optional.of((int) orderId);
+	}
+
+	public static OrderStatusHistoryEntity toCancellationTransition(Integer orderId,
+			CancellationDecision.Cancellation cancellation) {
+		return OrderStatusHistoryEntity.newTransition(orderId, cancellation.status().name(),
+				cancellation.reason().name(), cancellation.at());
+	}
+
+	public static RecordedTransition toRecordedTransition(OrderStatusHistoryEntity transition) {
+		OrderStatus status = OrderStatus.valueOf(transition.getStatus());
+		return new RecordedTransition(status, toRejectionReason(status, transition.getReason()),
+				toCancellationReason(status, transition.getReason()));
+	}
+
 	private static Order toOrder(OrderEntity order) {
 		return new Order(order.getId(), InstrumentMapper.toInstrumentRef(order.getInstrument()),
 				toLedgerSide(order.getSide()), OrderStatus.valueOf(order.getStatus()),
@@ -85,6 +107,20 @@ public final class OrderMapper {
 
 	private static String toReasonColumn(NewOrder order) {
 		return order.rejectionReason().map(RejectionReason::name).orElse(null);
+	}
+
+	private static Optional<RejectionReason> toRejectionReason(OrderStatus status, String reason) {
+		if (status != OrderStatus.REJECTED) {
+			return Optional.empty();
+		}
+		return Optional.ofNullable(reason).map(RejectionReason::valueOf);
+	}
+
+	private static Optional<CancellationReason> toCancellationReason(OrderStatus status, String reason) {
+		if (status != OrderStatus.CANCELLED) {
+			return Optional.empty();
+		}
+		return Optional.ofNullable(reason).map(CancellationReason::valueOf);
 	}
 
 }

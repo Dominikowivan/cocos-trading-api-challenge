@@ -15,6 +15,7 @@ import com.cocos.trading.model.ledger.AccountLedger;
 import com.cocos.trading.model.ledger.AccountSnapshot;
 import com.cocos.trading.model.order.NewOrder;
 import com.cocos.trading.model.order.OrderStatus;
+import com.cocos.trading.model.order.RecordedTransition;
 import com.cocos.trading.persistence.InstrumentRepository;
 import com.cocos.trading.persistence.OrderRepository;
 import com.cocos.trading.persistence.OrderStatusHistoryRepository;
@@ -92,11 +93,12 @@ public class CashTransferService {
 	private RecordedTransfer recordedTransfer(Integer orderId) {
 		NewOrder recorded = orderRepository.findPlacedOrder(orderId)
 			.orElseThrow(() -> new IllegalStateException("order " + orderId + " is named by a key but is not stored"));
-		return RecordedTransfer.of(orderId, withTheReasonItWasRejectedFor(recorded, orderId));
+		return RecordedTransfer.of(orderId, recorded.as(firstOutcomeOf(orderId)));
 	}
 
-	private NewOrder withTheReasonItWasRejectedFor(NewOrder recorded, Integer orderId) {
-		return orderStatusHistoryRepository.reasonOf(orderId).map(recorded::rejectedFor).orElse(recorded);
+	private RecordedTransition firstOutcomeOf(Integer orderId) {
+		return orderStatusHistoryRepository.firstTransitionOf(orderId)
+			.orElseThrow(() -> new IllegalStateException("order " + orderId + " is named by a key but has no history"));
 	}
 
 }

@@ -1,0 +1,204 @@
+openapi: 3.1.0
+
+info:
+  title: Cocos Trading API — Order Cancellation (design-time proposal)
+  version: 0.1.0
+  description: |
+    The design-time proposal for the order cancellation endpoint of feature
+    `005-order-cancellation`. It is **not** the live contract: implementation applies this
+    operation, and the widened `Order.status`, to `docs/api/openapi.yaml`, the one file every
+    response in the web tests validates against (ADR-0024), and adds the requests to
+    `docs/api/trading-api.http`. This file is kept as it was proposed and is not edited afterwards
+    (constitution, *Technology and Scope Constraints*).
+
+    Requirement ids below (`FR-`, `SC-`, research `R-`) refer to `specs/005-order-cancellation/`.
+
+    Three rules shape this operation:
+
+    - **Only `NEW` can be cancelled.** The rule is the status, not the type or the side: a `FILLED`,
+      `REJECTED` or already `CANCELLED` order — a transfer included — is refused with `409` and left
+      as it was (FR-005, FR-007, R-408).
+    - **A foreign order is a missing order.** An order of another user answers the same `404`, with
+      the same detail, as an id that does not exist (FR-004, R-411).
+    - **Nothing moves but the status.** The order stays in the ledger; its reservation stops counting,
+      which the next portfolio read shows. Settled cash and holdings do not change (FR-008, R-409).
+
+servers:
+  - url: http://localhost:8080
+    description: Local development (docker compose database on port 5433)
+
+paths:
+  /api/v1/users/{userId}/orders/{orderId}/cancel:
+    post:
+      operationId: cancelOrder
+      summary: Cancel one of the user's pending orders
+      description: |
+        Moves one order of the user from `NEW` to `CANCELLED` and appends that transition, with the
+        reason `USER_REQUESTED`, to the order's status history in the same transaction (FR-006). What
+        the order reserved — cash for a `BUY`, shares for a `SELL` — is available again in the user's
+        next portfolio read (FR-008).
+
+        There is no request body. `200` means the order is `CANCELLED`; `400`, `404`, `409` and `503`
+        mean nothing was written.
+
+        A cancellation is serialised with every other write of the same user — order submissions,
+        cash transfers and other cancellations — so two cancellations of one order never both
+        succeed (FR-010, FR-011). The path has no trailing slash (R-401).
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          description: |
+            Untrusted identifier; there is no authentication (ADR-0007). `0` or below answers `400`
+            (FR-002, R-403).
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+          example: 1
+        - name: orderId
+          in: path
+          required: true
+          description: |
+            The order to cancel. Looked up **within** the user: an order of another user is not
+            found. `0` or below answers `400`.
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+          example: 5
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: |
+            Optional caller-chosen key (FR-012). The same key for the same user and order returns the
+            first outcome — the order `CANCELLED` — instead of a `409` for an order that is no longer
+            `NEW`. Keys are scoped per user and **shared with order submission and cash transfer**: a
+            key this user already used there, or for a different cancellation, answers `409`
+            (FR-013). A cancellation refused with `400`, `404` or `409` leaves no trace of its key
+            (FR-014).
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+          example: cancel-5
+      responses:
+        "200":
+          description: |
+            The order is `CANCELLED`. Every field but `status` is the order's, unchanged; the
+            schema is the one order submission answers (R-402). A replayed idempotent request
+            answers here too, with the same order.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+              examples:
+                cancelledLimitBuy:
+                  summary: User 1 cancels seeded order 5, releasing 35,500.00 (SC-001)
+                  value:
+                    orderId: 5
+                    userId: 1
+                    instrumentId: 45
+                    ticker: LOMA
+                    type: LIMIT
+                    side: BUY
+                    status: CANCELLED
+                    size: 50
+                    price: 710.00
+                    rejectionReason: null
+                    submittedAt: "2023-07-12T15:14:20"
+        "400":
+          description: |
+            Nothing was written. An id is `0` or below, or not a number; or the key is blank or longer
+            than 255 characters. Judged before the user or the order is looked up.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+              example:
+                title: Bad Request
+                status: 400
+                detail: "An order id is a positive whole number, and 0 is not"
+                instance: /api/v1/users/1/orders/0/cancel
+        "404":
+          description: |
+            Nothing was written. No user with that id; or no order with that id **for that user** —
+            whether it does not exist or belongs to someone else, the answer is identical (FR-004).
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+              examples:
+                unknownUser:
+                  summary: A user that does not exist
+                  value:
+                    title: Not Found
+                    status: 404
+                    detail: User 999 does not exist
+                    instance: /api/v1/users/999/orders/5/cancel
+                foreignOrder:
+                  summary: User 2 naming user 1's order 5 — the same answer as order 999
+                  value:
+                    title: Not Found
+                    status: 404
+                    detail: Order 5 does not exist for user 2
+                    instance: /api/v1/users/2/orders/5/cancel
+        "409":
+          description: |
+            Nothing was written. Either the order exists for the user but is not `NEW` — already
+            `CANCELLED`, `FILLED`, `REJECTED`, or a transfer — so it cannot be cancelled (FR-005); or
+            the `Idempotency-Key` already names a different request of this user (FR-013). The detail
+            tells them apart.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+              examples:
+                notCancellable:
+                  summary: Seeded order 2 is FILLED
+                  value:
+                    title: Conflict
+                    status: 409
+                    detail: "Order 2 is FILLED; only a NEW order can be cancelled"
+                    instance: /api/v1/users/1/orders/2/cancel
+        "503":
+          description: |
+            The database did not answer in time (ADR-0031). Nothing was changed; the same request can
+            be retried.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+
+components:
+  schemas:
+    Order:
+      description: |
+        The live `Order` schema of `docs/api/openapi.yaml`, unchanged except for `status`, which
+        gains `CANCELLED`. Its other properties are not repeated here.
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [FILLED, NEW, REJECTED, CANCELLED]
+          description: |
+            `CANCELLED` — the user cancelled the order while it was `NEW`; it reserves nothing. It
+            appears in a cancellation's answer, and never in a submission's first answer.
+    Problem:
+      description: RFC 9457 problem detail, as in `docs/api/openapi.yaml`.
+      type: object
+      required: [title, status]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          default: about:blank
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference

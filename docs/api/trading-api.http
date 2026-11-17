@@ -9,8 +9,8 @@
 # Response contract, enforced by the web tests (ADR-0024):
 #   docs/api/openapi.yaml
 #
-# The portfolio, instrument search, order submission and cash transfer sections are below;
-# cancellation gets its own as that feature lands.
+# The portfolio, instrument search, order submission, cash transfer and order cancellation
+# sections are below.
 #
 # The submission requests at the end of this file **write to the ledger**, so their figures hold
 # from the seeded state. To get back to it: docker compose down -v, then up again (the dataset is
@@ -367,3 +367,57 @@ POST {{host}}/api/v1/users/2/cash-transfers
 Content-Type: application/json
 
 {"side": "CASH_IN", "amount": 100, "instrumentId": 66}
+
+###############################################################################
+# Order cancellation — POST /api/v1/users/{userId}/orders/{orderId}/cancel
+#
+# Moves one NEW order of the user to CANCELLED, with the reason USER_REQUESTED in its history; no
+# body. 200 with the order; 404 for a missing or foreign order, with the same detail; 409 for an
+# order that is not NEW (ADR-0041). What the order reserved is available again in the next
+# portfolio read; settled cash does not move.
+# Expected figures: specs/005-order-cancellation/quickstart.md
+#
+# These requests change user 1's orders 5 and 7. Run them from the seeded state, in this order.
+###############################################################################
+
+### Cancel a pending buy (scenario 1, SC-001)
+# 200. orderId 5, LOMA, LIMIT, BUY, size 50, price 710.00, status CANCELLED, rejectionReason null.
+POST {{host}}/api/v1/users/{{userId}}/orders/5/cancel
+
+### The reservation is released (scenario 1)
+# 200. availableCash 663000.00 (35500.00 more than before), settledCash still 753000.00.
+GET {{host}}/api/v1/users/{{userId}}/portfolio
+Accept: application/json
+
+### Cancel the same order again — no longer NEW (scenario 3)
+# 409, detail "Order 5 is CANCELLED; only a NEW order can be cancelled". Nothing is written.
+POST {{host}}/api/v1/users/{{userId}}/orders/5/cancel
+
+### Cancel an order that was filled (scenario 3)
+# 409, detail "Order 2 is FILLED; only a NEW order can be cancelled".
+POST {{host}}/api/v1/users/{{userId}}/orders/2/cancel
+
+### Cancel someone else's order (scenario 4, FR-004)
+# 404, detail "Order 7 does not exist for user 2" — the same answer as an order that does not
+# exist. Order 7 stays NEW.
+POST {{host}}/api/v1/users/2/orders/7/cancel
+
+### Cancel an order that does not exist (scenario 4)
+# 404, detail "Order 999 does not exist for user 2".
+POST {{host}}/api/v1/users/2/orders/999/cancel
+
+### A keyed cancellation — the first request with a key (scenario 6, FR-012)
+# 200, order 7 CANCELLED. availableCash is now 753000.00: nothing is reserved any more.
+POST {{host}}/api/v1/users/{{userId}}/orders/7/cancel
+Idempotency-Key: cancel-7
+
+### The same cancellation again with the same key — the retry, not a 409
+# 200 with the same order, CANCELLED. Still one CANCELLED history row for order 7.
+POST {{host}}/api/v1/users/{{userId}}/orders/7/cancel
+Idempotency-Key: cancel-7
+
+### The same key for a different order — a conflict (FR-013)
+# 409, detail naming the key. Keys are one namespace per user across submission, transfer and
+# cancellation.
+POST {{host}}/api/v1/users/{{userId}}/orders/5/cancel
+Idempotency-Key: cancel-7
