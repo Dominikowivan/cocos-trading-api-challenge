@@ -37,7 +37,9 @@ class UserLockComponentTest {
 
 	@Test
 	void an_unknown_user_has_no_row_to_lock() {
-		assertThatThrownBy(() -> new TransactionTemplate(transactionManager)
+		TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+
+		assertThatThrownBy(() -> transaction
 			.execute(status -> userLock.underTheLockOf(new UserId(999), userIdColumn -> userIdColumn)))
 			.isInstanceOf(UnknownUserException.class);
 	}

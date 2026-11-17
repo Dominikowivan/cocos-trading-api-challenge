@@ -56,7 +56,10 @@ class IdempotentWriteTest {
 	void the_same_key_with_another_fingerprint_is_a_conflict() {
 		onceInATransaction(keyed("k-conflict", "a"), new AtomicInteger());
 
-		assertThatThrownBy(() -> onceInATransaction(keyed("k-conflict", "b"), new AtomicInteger()))
+		KeyedRequest sameKeyOtherFingerprint = keyed("k-conflict", "b");
+		AtomicInteger worked = new AtomicInteger();
+
+		assertThatThrownBy(() -> onceInATransaction(sameKeyOtherFingerprint, worked))
 			.isInstanceOf(IdempotencyConflictException.class);
 	}
 
