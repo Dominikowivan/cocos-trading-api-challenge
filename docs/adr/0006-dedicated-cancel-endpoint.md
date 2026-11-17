@@ -1,6 +1,6 @@
 # ADR-0006: A dedicated endpoint for cancelling an order
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-0041](0041-the-order-cancellation-endpoint-shape.md)
 - **Date:** 2026-11-15
 - **Journal:** [01PrimeraLectura](../journal/01PrimeraLectura.md), *Decisiones extra → Endpoint*
 
