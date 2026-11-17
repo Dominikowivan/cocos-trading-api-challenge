@@ -1,11 +1,11 @@
 package com.cocos.trading.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -18,7 +18,7 @@ class CancellationOutsideWriterTest extends CancellationWebTestBase {
 
 	private static final Duration DEADLINE = Duration.ofSeconds(10);
 
-	private static final long POLL_MILLIS = 20;
+	private static final Duration POLL = Duration.ofMillis(20);
 
 	@Autowired
 	private DataSource dataSource;
@@ -44,14 +44,10 @@ class CancellationOutsideWriterTest extends CancellationWebTestBase {
 		return connection;
 	}
 
-	private void awaitAnUpdateBlockedOnTheOrderRow() throws InterruptedException {
-		Instant giveUpAt = Instant.now().plus(DEADLINE);
-		while (blockedOrderUpdates() == 0) {
-			if (Instant.now().isAfter(giveUpAt)) {
-				throw new IllegalStateException("the cancellation never reached the guarded update");
-			}
-			TimeUnit.MILLISECONDS.sleep(POLL_MILLIS);
-		}
+	private void awaitAnUpdateBlockedOnTheOrderRow() {
+		await("the cancellation reaching the guarded update").atMost(DEADLINE)
+			.pollInterval(POLL)
+			.until(() -> blockedOrderUpdates() > 0);
 	}
 
 	private long blockedOrderUpdates() {
