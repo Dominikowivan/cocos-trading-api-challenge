@@ -5,7 +5,7 @@ import static com.cocos.trading.service.submission.InvalidSubmissionException.re
 import java.math.BigDecimal;
 
 import com.cocos.trading.model.instrument.InstrumentRef;
-import com.cocos.trading.model.order.OrderKind;
+import com.cocos.trading.model.order.OrderType;
 import com.cocos.trading.model.order.OrderSide;
 import com.cocos.trading.model.submission.Submission;
 import com.cocos.trading.model.submission.TradeQuantity;
@@ -17,7 +17,7 @@ final class RequestedSubmission {
 
 	private final Integer instrumentIdColumn;
 
-	private final OrderKind kind;
+	private final OrderType type;
 
 	private final OrderSide side;
 
@@ -25,11 +25,11 @@ final class RequestedSubmission {
 
 	private final BigDecimal limitPrice;
 
-	private RequestedSubmission(UserId userId, Integer instrumentIdColumn, OrderKind kind, OrderSide side,
+	private RequestedSubmission(UserId userId, Integer instrumentIdColumn, OrderType type, OrderSide side,
 			TradeQuantity quantity, BigDecimal limitPrice) {
 		this.userId = userId;
 		this.instrumentIdColumn = instrumentIdColumn;
-		this.kind = kind;
+		this.type = type;
 		this.side = side;
 		this.quantity = quantity;
 		this.limitPrice = limitPrice;
@@ -37,7 +37,7 @@ final class RequestedSubmission {
 
 	static RequestedSubmission read(SubmissionRequest request) {
 		return new RequestedSubmission(new UserId(request.userId()), instrumentIdColumnOf(request.instrumentId()),
-				kindOf(request.type()), sideOf(request.side()), quantityOf(request), request.price());
+				typeOf(request.type()), sideOf(request.side()), quantityOf(request), request.price());
 	}
 
 	UserId userId() {
@@ -49,7 +49,7 @@ final class RequestedSubmission {
 	}
 
 	Submission tradedAs(InstrumentRef instrument) {
-		return refusing(() -> Submission.of(instrument, side, kind, quantity, limitPrice));
+		return refusing(() -> Submission.of(instrument, side, type, quantity, limitPrice));
 	}
 
 	private static Integer instrumentIdColumnOf(Long instrumentId) {
@@ -62,12 +62,12 @@ final class RequestedSubmission {
 		return instrumentId.intValue();
 	}
 
-	private static OrderKind kindOf(String type) {
+	private static OrderType typeOf(String type) {
 		if (type == null) {
 			throw new InvalidSubmissionException("An order states its type in 'type': MARKET or LIMIT");
 		}
 		try {
-			return OrderKind.valueOf(type);
+			return OrderType.valueOf(type);
 		}
 		catch (IllegalArgumentException unknown) {
 			throw new InvalidSubmissionException("Unknown type '" + type + "': an order is MARKET or LIMIT", unknown);

@@ -9,8 +9,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.cocos.trading.controller.dto.OrderResponse;
-import com.cocos.trading.controller.dto.OrderSubmissionRequest;
+import com.cocos.trading.controller.dto.request.OrderSubmissionRequest;
+import com.cocos.trading.controller.dto.response.OrderResponse;
 import com.cocos.trading.service.submission.OrderSubmissionService;
 import com.cocos.trading.service.submission.SubmissionRequest;
 

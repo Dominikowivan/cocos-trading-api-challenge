@@ -1,6 +1,8 @@
-package com.cocos.trading.model.order;
+package com.cocos.trading.model.order.cancellation;
 
 import java.time.LocalDateTime;
+
+import com.cocos.trading.model.order.OrderStatus;
 
 public sealed interface CancellationDecision {
 

@@ -19,7 +19,7 @@ import com.cocos.trading.model.Price;
 import com.cocos.trading.model.instrument.InstrumentRef;
 import com.cocos.trading.model.order.CashMovement;
 import com.cocos.trading.model.order.NewOrder;
-import com.cocos.trading.model.order.OrderKind;
+import com.cocos.trading.model.order.OrderType;
 import com.cocos.trading.model.order.OrderStatus;
 import com.cocos.trading.model.order.RejectionReason;
 import com.cocos.trading.model.user.UserId;
@@ -61,7 +61,7 @@ class CashOrderAppendTest extends PersistenceTestBase {
 
 		assertThat(read.side()).isEqualTo(CashMovement.CASH_IN);
 		assertThat(read.status()).isEqualTo(OrderStatus.FILLED);
-		assertThat(read.kind()).isEqualTo(OrderKind.MARKET);
+		assertThat(read.type()).isEqualTo(OrderType.MARKET);
 		assertThat(read.instrument().isCash()).isTrue();
 		assertThat(read.size()).isEqualByComparingTo(ONE_HUNDRED_THOUSAND);
 		assertThat(read.price().amount()).isEqualByComparingTo(BigDecimal.ONE);
@@ -112,7 +112,7 @@ class CashOrderAppendTest extends PersistenceTestBase {
 	}
 
 	private static NewOrder cashOrder(CashMovement side, OrderStatus status, Optional<RejectionReason> reason) {
-		return new NewOrder(NEVER_TRADED_USER, ARS, side, OrderKind.MARKET, status, ONE_HUNDRED_THOUSAND,
+		return new NewOrder(NEVER_TRADED_USER, ARS, side, OrderType.MARKET, status, ONE_HUNDRED_THOUSAND,
 				Price.of(BigDecimal.ONE), reason, LocalDateTime.now().truncatedTo(ChronoUnit.MICROS));
 	}
 

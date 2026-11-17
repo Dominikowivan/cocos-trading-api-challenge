@@ -6,16 +6,17 @@ import java.util.List;
 import java.util.Optional;
 
 import com.cocos.trading.model.Price;
-import com.cocos.trading.model.order.CancellationDecision;
-import com.cocos.trading.model.order.CancellationReason;
+import com.cocos.trading.model.order.cancellation.CancellationDecision;
+import com.cocos.trading.model.order.cancellation.CancellationReason;
 import com.cocos.trading.model.order.CashMovement;
 import com.cocos.trading.model.order.LedgerSide;
 import com.cocos.trading.model.order.NewOrder;
 import com.cocos.trading.model.order.Order;
-import com.cocos.trading.model.order.OrderKind;
+import com.cocos.trading.model.order.OrderType;
 import com.cocos.trading.model.order.OrderSide;
 import com.cocos.trading.model.order.OrderStatus;
 import com.cocos.trading.model.order.RecordedTransition;
+import com.cocos.trading.model.order.TransitionReason;
 import com.cocos.trading.model.order.RejectionReason;
 import com.cocos.trading.model.user.UserId;
 import com.cocos.trading.persistence.entity.OrderEntity;
@@ -42,13 +43,13 @@ public final class OrderMapper {
 			.atPrice(order.price().amount())
 			.onSide(order.side().name())
 			.withStatus(order.status().name())
-			.ofType(order.kind().name())
+			.ofType(order.type().name())
 			.placedAt(order.occurredAt());
 	}
 
 	public static NewOrder toPlacedOrder(OrderEntity order) {
 		return new NewOrder(new UserId(order.getUserId()), InstrumentMapper.toInstrumentRef(order.getInstrument()),
-				toLedgerSide(order.getSide()), OrderKind.valueOf(order.getType()),
+				toLedgerSide(order.getSide()), OrderType.valueOf(order.getType()),
 				OrderStatus.valueOf(order.getStatus()), BigDecimal.valueOf(order.getSize()), Price.of(order.getPrice()),
 				Optional.empty(), order.getDatetime());
 	}
@@ -73,14 +74,13 @@ public final class OrderMapper {
 
 	public static RecordedTransition toRecordedTransition(OrderStatusHistoryEntity transition) {
 		OrderStatus status = OrderStatus.valueOf(transition.getStatus());
-		return new RecordedTransition(status, toRejectionReason(status, transition.getReason()),
-				toCancellationReason(status, transition.getReason()));
+		return new RecordedTransition(status, toTransitionReason(status, transition.getReason()));
 	}
 
 	private static Order toOrder(OrderEntity order) {
 		return new Order(order.getId(), InstrumentMapper.toInstrumentRef(order.getInstrument()),
 				toLedgerSide(order.getSide()), OrderStatus.valueOf(order.getStatus()),
-				OrderKind.valueOf(order.getType()), BigDecimal.valueOf(order.getSize()), order.getPrice(),
+				OrderType.valueOf(order.getType()), BigDecimal.valueOf(order.getSize()), order.getPrice(),
 				order.getDatetime());
 	}
 
@@ -109,18 +109,17 @@ public final class OrderMapper {
 		return order.rejectionReason().map(RejectionReason::name).orElse(null);
 	}
 
-	private static Optional<RejectionReason> toRejectionReason(OrderStatus status, String reason) {
-		if (status != OrderStatus.REJECTED) {
-			return Optional.empty();
+	private static TransitionReason toTransitionReason(OrderStatus status, String reason) {
+		if (reason == null) {
+			return new TransitionReason.Unstated();
 		}
-		return Optional.ofNullable(reason).map(RejectionReason::valueOf);
-	}
-
-	private static Optional<CancellationReason> toCancellationReason(OrderStatus status, String reason) {
-		if (status != OrderStatus.CANCELLED) {
-			return Optional.empty();
+		if (status == OrderStatus.REJECTED) {
+			return new TransitionReason.Rejected(RejectionReason.valueOf(reason));
 		}
-		return Optional.ofNullable(reason).map(CancellationReason::valueOf);
+		if (status == OrderStatus.CANCELLED) {
+			return new TransitionReason.Cancelled(CancellationReason.valueOf(reason));
+		}
+		return new TransitionReason.Unstated();
 	}
 
 }

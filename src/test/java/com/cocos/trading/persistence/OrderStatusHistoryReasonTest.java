@@ -18,13 +18,14 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import com.cocos.trading.model.Price;
 import com.cocos.trading.model.instrument.InstrumentRef;
-import com.cocos.trading.model.order.CancellationReason;
+import com.cocos.trading.model.order.cancellation.CancellationReason;
 import com.cocos.trading.model.order.NewOrder;
-import com.cocos.trading.model.order.OrderKind;
+import com.cocos.trading.model.order.OrderType;
 import com.cocos.trading.model.order.OrderSide;
 import com.cocos.trading.model.order.OrderStatus;
 import com.cocos.trading.model.order.RecordedTransition;
 import com.cocos.trading.model.order.RejectionReason;
+import com.cocos.trading.model.order.TransitionReason;
 import com.cocos.trading.model.user.UserId;
 import com.cocos.trading.persistence.entity.OrderStatusHistoryEntity;
 import com.cocos.trading.persistence.mapper.OrderMapper;
@@ -61,8 +62,8 @@ class OrderStatusHistoryReasonTest extends PersistenceTestBase {
 		cancelledWithJdbc(orderId);
 
 		assertThat(transitionsOf(orderId)).containsExactly(
-				new RecordedTransition(OrderStatus.NEW, Optional.empty(), Optional.empty()), new RecordedTransition(
-						OrderStatus.CANCELLED, Optional.empty(), Optional.of(CancellationReason.USER_REQUESTED)));
+				new RecordedTransition(OrderStatus.NEW, new TransitionReason.Unstated()), new RecordedTransition(
+						OrderStatus.CANCELLED, new TransitionReason.Cancelled(CancellationReason.USER_REQUESTED)));
 	}
 
 	@Test
@@ -70,7 +71,7 @@ class OrderStatusHistoryReasonTest extends PersistenceTestBase {
 		Integer orderId = appended(limitBuy(OrderStatus.REJECTED, Optional.of(RejectionReason.INSUFFICIENT_FUNDS)));
 
 		assertThat(transitionsOf(orderId)).containsExactly(new RecordedTransition(OrderStatus.REJECTED,
-				Optional.of(RejectionReason.INSUFFICIENT_FUNDS), Optional.empty()));
+				new TransitionReason.Rejected(RejectionReason.INSUFFICIENT_FUNDS)));
 	}
 
 	private List<RecordedTransition> transitionsOf(Integer orderId) {
@@ -98,7 +99,7 @@ class OrderStatusHistoryReasonTest extends PersistenceTestBase {
 	}
 
 	private static NewOrder limitBuy(OrderStatus status, Optional<RejectionReason> reason) {
-		return new NewOrder(NEVER_TRADED_USER, PAMP, OrderSide.BUY, OrderKind.LIMIT, status, BigDecimal.TEN,
+		return new NewOrder(NEVER_TRADED_USER, PAMP, OrderSide.BUY, OrderType.LIMIT, status, BigDecimal.TEN,
 				Price.of(new BigDecimal("900.00")), reason, LocalDateTime.now().truncatedTo(ChronoUnit.MICROS));
 	}
 

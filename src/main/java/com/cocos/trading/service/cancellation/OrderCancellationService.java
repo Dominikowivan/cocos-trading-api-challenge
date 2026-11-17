@@ -9,8 +9,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.cocos.trading.model.order.CancellationDecision;
-import com.cocos.trading.model.order.CancellationRule;
+import com.cocos.trading.model.order.cancellation.CancellationDecision;
+import com.cocos.trading.model.order.cancellation.CancellationRule;
 import com.cocos.trading.model.order.NewOrder;
 import com.cocos.trading.model.order.RecordedTransition;
 import com.cocos.trading.persistence.OrderRepository;

@@ -9,7 +9,7 @@
 The given schema (`V1`) declares no `NOT NULL` at all. The code, meanwhile, cannot read a row
 without certain columns:
 
-- `OrderMapper` calls `OrderSide.valueOf`, `OrderStatus.valueOf` and `OrderKind.valueOf` on the raw
+- `OrderMapper` calls `OrderSide.valueOf`, `OrderStatus.valueOf` and `OrderType.valueOf` on the raw
   columns; a `NULL` is a `NullPointerException`.
 - `OrderEntity.size` is a primitive `int`; Hibernate cannot load a `NULL` into it.
 - `Order.cashEffect()` multiplies by `price`; a `NULL` price fails there.

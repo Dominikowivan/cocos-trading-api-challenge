@@ -17,7 +17,7 @@ import com.cocos.trading.model.ledger.AccountSnapshot;
 import com.cocos.trading.model.ledger.Ledgers;
 import com.cocos.trading.model.order.CashMovement;
 import com.cocos.trading.model.order.NewOrder;
-import com.cocos.trading.model.order.OrderKind;
+import com.cocos.trading.model.order.OrderType;
 import com.cocos.trading.model.order.OrderStatus;
 import com.cocos.trading.model.order.RejectionReason;
 import com.cocos.trading.model.user.UserId;
@@ -79,7 +79,7 @@ class CashTransferDecisionTest {
 	void every_transfer_is_a_market_order_of_its_amount_at_one_peso_on_the_cash_instrument() {
 		for (NewOrder order : new NewOrder[] { deposit(250).recordedFor(NOTHING, ARS, USER, AT),
 				withdrawal(250).recordedFor(NOTHING, ARS, USER, AT) }) {
-			assertThat(order.kind()).isEqualTo(OrderKind.MARKET);
+			assertThat(order.type()).isEqualTo(OrderType.MARKET);
 			assertThat(order.price().amount()).isEqualByComparingTo(BigDecimal.ONE);
 			assertThat(order.size()).isEqualByComparingTo("250");
 			assertThat(order.instrument()).isEqualTo(ARS);

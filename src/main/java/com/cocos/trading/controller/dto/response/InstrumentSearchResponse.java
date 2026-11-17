@@ -1,4 +1,4 @@
-package com.cocos.trading.controller.dto;
+package com.cocos.trading.controller.dto.response;
 
 import java.util.List;
 

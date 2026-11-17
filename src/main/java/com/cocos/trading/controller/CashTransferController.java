@@ -9,8 +9,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.cocos.trading.controller.dto.CashTransferRequest;
-import com.cocos.trading.controller.dto.CashTransferResponse;
+import com.cocos.trading.controller.dto.request.CashTransferRequest;
+import com.cocos.trading.controller.dto.response.CashTransferResponse;
 import com.cocos.trading.service.transfer.CashTransferService;
 import com.cocos.trading.service.transfer.TransferRequest;
 

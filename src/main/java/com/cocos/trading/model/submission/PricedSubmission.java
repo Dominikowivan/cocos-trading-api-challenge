@@ -33,11 +33,11 @@ public final class PricedSubmission {
 		if (isBelowOneShare(size)) {
 			return OrderDecision.rejected(RejectionReason.SIZE_BELOW_ONE_SHARE, size, price);
 		}
-		return OrderDecision.accepted(submission.kind().acceptedStatus(), size, price);
+		return OrderDecision.accepted(submission.type().acceptedStatus(), size, price);
 	}
 
 	public NewOrder placedBy(UserId userId, OrderDecision decision, LocalDateTime at) {
-		return new NewOrder(userId, submission.instrument(), submission.side(), submission.kind(), decision.status(),
+		return new NewOrder(userId, submission.instrument(), submission.side(), submission.type(), decision.status(),
 				decision.size(), decision.price(), decision.rejectionReason(), at);
 	}
 

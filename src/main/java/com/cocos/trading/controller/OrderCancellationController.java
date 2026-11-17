@@ -5,7 +5,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.cocos.trading.controller.dto.OrderResponse;
+import com.cocos.trading.controller.dto.response.OrderResponse;
 import com.cocos.trading.service.cancellation.CancellationRequest;
 import com.cocos.trading.service.cancellation.OrderCancellationService;
 

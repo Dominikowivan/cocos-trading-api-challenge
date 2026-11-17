@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 
 import com.cocos.trading.model.instrument.InstrumentRef;
 
-public record Order(long orderId, InstrumentRef instrument, LedgerSide side, OrderStatus status, OrderKind kind,
+public record Order(long orderId, InstrumentRef instrument, LedgerSide side, OrderStatus status, OrderType type,
 		BigDecimal quantity, BigDecimal price, LocalDateTime occurredAt) {
 
 	public boolean isSettled() {
@@ -31,11 +31,11 @@ public record Order(long orderId, InstrumentRef instrument, LedgerSide side, Ord
 	}
 
 	public boolean reservesCash() {
-		return status.isOpen() && kind == OrderKind.LIMIT && side == OrderSide.BUY;
+		return status.isOpen() && type == OrderType.LIMIT && side == OrderSide.BUY;
 	}
 
 	public boolean reservesShares() {
-		return status.isOpen() && kind == OrderKind.LIMIT && side == OrderSide.SELL;
+		return status.isOpen() && type == OrderType.LIMIT && side == OrderSide.SELL;
 	}
 
 	public BigDecimal committedAmount() {

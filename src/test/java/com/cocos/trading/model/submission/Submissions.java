@@ -14,7 +14,7 @@ import com.cocos.trading.model.instrument.InstrumentRef;
 import com.cocos.trading.model.ledger.AccountLedger;
 import com.cocos.trading.model.ledger.AccountSnapshot;
 import com.cocos.trading.model.ledger.Ledgers;
-import com.cocos.trading.model.order.OrderKind;
+import com.cocos.trading.model.order.OrderType;
 import com.cocos.trading.model.order.OrderSide;
 
 public final class Submissions {
@@ -74,7 +74,7 @@ public final class Submissions {
 	}
 
 	public static Submission marketOrderOf(InstrumentRef instrument, OrderSide side, long size) {
-		return Submission.of(instrument, side, OrderKind.MARKET, sizeOf(size), null);
+		return Submission.of(instrument, side, OrderType.MARKET, sizeOf(size), null);
 	}
 
 	public static Submission marketOrderOfAmount(OrderSide side, String amount) {
@@ -82,7 +82,7 @@ public final class Submissions {
 	}
 
 	public static Submission marketOrderOfAmount(InstrumentRef instrument, OrderSide side, String amount) {
-		return Submission.of(instrument, side, OrderKind.MARKET, amountOf(amount), null);
+		return Submission.of(instrument, side, OrderType.MARKET, amountOf(amount), null);
 	}
 
 	public static Submission limitOrderOf(OrderSide side, long size, String price) {
@@ -90,11 +90,11 @@ public final class Submissions {
 	}
 
 	public static Submission limitOrderOf(InstrumentRef instrument, OrderSide side, long size, String price) {
-		return Submission.of(instrument, side, OrderKind.LIMIT, sizeOf(size), new BigDecimal(price));
+		return Submission.of(instrument, side, OrderType.LIMIT, sizeOf(size), new BigDecimal(price));
 	}
 
 	public static Submission limitOrderOfAmount(OrderSide side, String amount, String price) {
-		return Submission.of(Ledgers.PAMP, side, OrderKind.LIMIT, amountOf(amount), new BigDecimal(price));
+		return Submission.of(Ledgers.PAMP, side, OrderType.LIMIT, amountOf(amount), new BigDecimal(price));
 	}
 
 	public static TradeQuantity sizeOf(long size) {

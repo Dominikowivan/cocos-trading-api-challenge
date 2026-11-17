@@ -1,4 +1,4 @@
-package com.cocos.trading.model.order;
+package com.cocos.trading.model.order.cancellation;
 
 public enum CancellationReason {
 

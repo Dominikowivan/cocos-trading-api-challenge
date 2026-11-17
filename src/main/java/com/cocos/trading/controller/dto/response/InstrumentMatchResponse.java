@@ -1,9 +1,9 @@
-package com.cocos.trading.controller.dto;
+package com.cocos.trading.controller.dto.response;
 
 import java.math.BigDecimal;
 
-import com.cocos.trading.model.instrument.InstrumentRef;
 import com.cocos.trading.model.instrument.DailyClose;
+import com.cocos.trading.model.instrument.InstrumentRef;
 import com.cocos.trading.service.search.InstrumentMatch;
 
 public record InstrumentMatchResponse(long instrumentId, String ticker, String name, String type, BigDecimal close,

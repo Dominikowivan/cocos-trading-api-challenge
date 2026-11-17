@@ -1,4 +1,4 @@
-package com.cocos.trading.model.order;
+package com.cocos.trading.model.order.cancellation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -7,6 +7,8 @@ import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+
+import com.cocos.trading.model.order.OrderStatus;
 
 class CancellationRuleTest {
 

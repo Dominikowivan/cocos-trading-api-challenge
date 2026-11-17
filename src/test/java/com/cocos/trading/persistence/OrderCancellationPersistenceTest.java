@@ -14,8 +14,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import com.cocos.trading.model.order.CancellationDecision;
-import com.cocos.trading.model.order.CancellationReason;
+import com.cocos.trading.model.order.cancellation.CancellationDecision;
+import com.cocos.trading.model.order.cancellation.CancellationReason;
 import com.cocos.trading.model.order.NewOrder;
 import com.cocos.trading.model.order.OrderStatus;
 import com.cocos.trading.persistence.entity.OrderStatusHistoryEntity;

@@ -8,11 +8,11 @@ import com.cocos.trading.model.Price;
 import com.cocos.trading.model.instrument.InstrumentRef;
 import com.cocos.trading.model.user.UserId;
 
-public record NewOrder(UserId userId, InstrumentRef instrument, LedgerSide side, OrderKind kind, OrderStatus status,
+public record NewOrder(UserId userId, InstrumentRef instrument, LedgerSide side, OrderType type, OrderStatus status,
 		BigDecimal size, Price price, Optional<RejectionReason> rejectionReason, LocalDateTime occurredAt) {
 
 	public NewOrder as(RecordedTransition outcome) {
-		return new NewOrder(userId, instrument, side, kind, outcome.status(), size, price, outcome.rejectionReason(),
+		return new NewOrder(userId, instrument, side, type, outcome.status(), size, price, outcome.rejectionReason(),
 				occurredAt);
 	}
 

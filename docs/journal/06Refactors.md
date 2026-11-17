@@ -19,4 +19,4 @@ Bueno, vamos uno por uno.
 - **3.b.** Con las conexiones de Hikari, lo mismo: vamos a dejar el default, pero dejemos el default expuesto como configuración, así se entiende que es una decisión tomada con consciencia.
 - **5.** Vamos primero con los issues de Sonar, que hay uno respecto a la paginación y no queremos pisar dos veces el mismo palito.
 - **4.** Ahora sí. Pero haciéndolo me di cuenta de que no tiene sentido: ya nos traemos todas las órdenes a memoria por diseño.
-  Lo que sí podemos hacer es reemplazar la paginación custom que pusimos por el `Pageable` de Spring. No habia necesidad desde un principio en una implementacion propia.
+  Lo que sí podemos hacer es reemplazar la paginación custom que pusimos por el `Pageable` de Spring. No había necesidad desde un principio en una implementación propia.

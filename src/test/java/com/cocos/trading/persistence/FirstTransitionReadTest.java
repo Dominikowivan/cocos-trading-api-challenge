@@ -16,14 +16,15 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import com.cocos.trading.model.Price;
 import com.cocos.trading.model.instrument.InstrumentRef;
-import com.cocos.trading.model.order.CancellationDecision;
-import com.cocos.trading.model.order.CancellationReason;
+import com.cocos.trading.model.order.cancellation.CancellationDecision;
+import com.cocos.trading.model.order.cancellation.CancellationReason;
 import com.cocos.trading.model.order.NewOrder;
-import com.cocos.trading.model.order.OrderKind;
+import com.cocos.trading.model.order.OrderType;
 import com.cocos.trading.model.order.OrderSide;
 import com.cocos.trading.model.order.OrderStatus;
 import com.cocos.trading.model.order.RecordedTransition;
 import com.cocos.trading.model.order.RejectionReason;
+import com.cocos.trading.model.order.TransitionReason;
 import com.cocos.trading.model.user.UserId;
 
 class FirstTransitionReadTest extends PersistenceTestBase {
@@ -59,9 +60,9 @@ class FirstTransitionReadTest extends PersistenceTestBase {
 				OrderStatus.CANCELLED, CancellationReason.USER_REQUESTED, LocalDateTime.now()));
 
 		assertThat(orderStatusHistoryRepository.firstTransitionOf(orderId))
-			.contains(new RecordedTransition(OrderStatus.NEW, Optional.empty(), Optional.empty()));
+			.contains(new RecordedTransition(OrderStatus.NEW, new TransitionReason.Unstated()));
 		assertThat(orderStatusHistoryRepository.cancellationOf(orderId)).contains(new RecordedTransition(
-				OrderStatus.CANCELLED, Optional.empty(), Optional.of(CancellationReason.USER_REQUESTED)));
+				OrderStatus.CANCELLED, new TransitionReason.Cancelled(CancellationReason.USER_REQUESTED)));
 	}
 
 	@Test
@@ -69,7 +70,7 @@ class FirstTransitionReadTest extends PersistenceTestBase {
 		Integer orderId = appended(limitBuy(OrderStatus.REJECTED, Optional.of(RejectionReason.INSUFFICIENT_FUNDS)));
 
 		assertThat(orderStatusHistoryRepository.firstTransitionOf(orderId)).contains(new RecordedTransition(
-				OrderStatus.REJECTED, Optional.of(RejectionReason.INSUFFICIENT_FUNDS), Optional.empty()));
+				OrderStatus.REJECTED, new TransitionReason.Rejected(RejectionReason.INSUFFICIENT_FUNDS)));
 		assertThat(orderStatusHistoryRepository.cancellationOf(orderId)).isEmpty();
 	}
 
@@ -82,7 +83,7 @@ class FirstTransitionReadTest extends PersistenceTestBase {
 	}
 
 	private static NewOrder limitBuy(OrderStatus status, Optional<RejectionReason> reason) {
-		return new NewOrder(NEVER_TRADED_USER, PAMP, OrderSide.BUY, OrderKind.LIMIT, status, BigDecimal.TEN,
+		return new NewOrder(NEVER_TRADED_USER, PAMP, OrderSide.BUY, OrderType.LIMIT, status, BigDecimal.TEN,
 				Price.of(new BigDecimal("900.00")), reason, LocalDateTime.now().truncatedTo(ChronoUnit.MICROS));
 	}
 
