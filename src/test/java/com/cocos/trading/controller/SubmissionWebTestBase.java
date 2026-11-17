@@ -1,5 +1,6 @@
 package com.cocos.trading.controller;
 
+import static com.cocos.trading.controller.ApiPaths.ORDERS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -19,9 +20,7 @@ import org.springframework.test.web.servlet.ResultActions;
 
 import com.jayway.jsonpath.JsonPath;
 
-abstract class SubmissionWebTestBase extends WebTestBase {
-
-	protected static final String ORDERS = "/api/v1/users/{userId}/orders";
+public abstract class SubmissionWebTestBase extends WebTestBase {
 
 	protected static final String IDEMPOTENCY_KEY = "Idempotency-Key";
 

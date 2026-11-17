@@ -18,8 +18,6 @@ import com.cocos.trading.service.transfer.TransferRequest;
 @RequestMapping("/api/v1/users/{userId}/cash-transfers")
 class CashTransferController {
 
-	private static final String IDEMPOTENCY_KEY = "Idempotency-Key";
-
 	private final CashTransferService cashTransferService;
 
 	CashTransferController(CashTransferService cashTransferService) {
@@ -29,7 +27,7 @@ class CashTransferController {
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
 	CashTransferResponse transfer(@PathVariable long userId, @RequestBody CashTransferRequest body,
-			@RequestHeader(name = IDEMPOTENCY_KEY, required = false) String idempotencyKey) {
+			@RequestHeader(name = IdempotencyHeader.NAME, required = false) String idempotencyKey) {
 		return CashTransferResponse.from(cashTransferService.transfer(transferOf(userId, body, idempotencyKey)));
 	}
 

@@ -16,7 +16,7 @@ import com.atlassian.oai.validator.report.LevelResolver;
 import com.atlassian.oai.validator.report.ValidationReport.Level;
 
 @TestConfiguration(proxyBeanMethods = false)
-class ContractValidationConfiguration {
+public class ContractValidationConfiguration {
 
 	private static final Path CONTRACT = Path.of("docs/api/openapi.yaml");
 

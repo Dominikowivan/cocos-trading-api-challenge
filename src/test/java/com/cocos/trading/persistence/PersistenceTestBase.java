@@ -7,6 +7,6 @@ import com.cocos.trading.TestcontainersConfiguration;
 
 @SpringBootTest(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
 @Import(TestcontainersConfiguration.class)
-abstract class PersistenceTestBase {
+public abstract class PersistenceTestBase {
 
 }

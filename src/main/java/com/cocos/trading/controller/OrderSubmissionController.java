@@ -18,8 +18,6 @@ import com.cocos.trading.service.submission.SubmissionRequest;
 @RequestMapping("/api/v1/users/{userId}/orders")
 class OrderSubmissionController {
 
-	private static final String IDEMPOTENCY_KEY = "Idempotency-Key";
-
 	private final OrderSubmissionService orderSubmissionService;
 
 	OrderSubmissionController(OrderSubmissionService orderSubmissionService) {
@@ -29,7 +27,7 @@ class OrderSubmissionController {
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
 	OrderResponse submit(@PathVariable long userId, @RequestBody OrderSubmissionRequest body,
-			@RequestHeader(name = IDEMPOTENCY_KEY, required = false) String idempotencyKey) {
+			@RequestHeader(name = IdempotencyHeader.NAME, required = false) String idempotencyKey) {
 		return OrderResponse.of(orderSubmissionService.submit(submissionOf(userId, body, idempotencyKey)));
 	}
 

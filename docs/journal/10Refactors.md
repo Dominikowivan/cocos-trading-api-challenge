@@ -14,8 +14,6 @@
 
 6 - Revisar si quedó algun índice a agregar donde se busque o lea (creo que no pero repasar)
 
-
-
 7a - tests: la carpeta de controller podría subdividirse por flujo
 7b- idem persistencia
 
@@ -30,4 +28,4 @@
 
 13 - En donde hay booleanos complejos y poco verbales (al estilo, "direction == CashMovement.CASH_OUT && snapshot.availableCash().compareTo(amount) < 0") extraer a una variable que diga sobre lo que se está decidiendo.
 
-14a- revisar por que CashTransferKeySharedWithOrdersTest tarda tanto en correr (40s para un test es muchisimo)
+14- repasar el readme.

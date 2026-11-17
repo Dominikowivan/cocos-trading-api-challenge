@@ -1,5 +1,7 @@
 package com.cocos.trading.controller;
 
+import static com.cocos.trading.controller.ApiPaths.CASH_TRANSFERS;
+import static com.cocos.trading.controller.ApiPaths.PORTFOLIO;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -11,9 +13,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.ResultActions;
 
-abstract class CashTransferWebTestBase extends SubmissionWebTestBase {
-
-	protected static final String CASH_TRANSFERS = "/api/v1/users/{userId}/cash-transfers";
+public abstract class CashTransferWebTestBase extends SubmissionWebTestBase {
 
 	protected static final long USER_THREE = 3;
 
