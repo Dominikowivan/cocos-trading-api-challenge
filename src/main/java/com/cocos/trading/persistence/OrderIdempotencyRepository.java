@@ -18,8 +18,13 @@ public interface OrderIdempotencyRepository extends JpaRepository<OrderIdempoten
 			VALUES (:userId, :key, :fingerprint, :claimedAt)
 			ON CONFLICT (userid, idempotency_key) DO NOTHING
 			""", nativeQuery = true)
-	int claim(@Param("userId") Integer userId, @Param("key") String key, @Param("fingerprint") String fingerprint,
+	int insertClaim(@Param("userId") Integer userId, @Param("key") String key, @Param("fingerprint") String fingerprint,
 			@Param("claimedAt") LocalDateTime claimedAt);
+
+	default boolean claim(Integer userId, String key, String fingerprint, LocalDateTime claimedAt) {
+		int rowsInserted = insertClaim(userId, key, fingerprint, claimedAt);
+		return rowsInserted > 0;
+	}
 
 	Optional<OrderIdempotencyEntity> findByUserIdAndIdempotencyKey(Integer userId, String key);
 

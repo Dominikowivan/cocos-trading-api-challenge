@@ -45,7 +45,7 @@ public final class OrderMapper {
 
 	public static NewOrder toPlacedOrder(OrderEntity order) {
 		return new NewOrder(new UserId(order.getUserId()), InstrumentMapper.toInstrumentRef(order.getInstrument()),
-				OrderSide.valueOf(order.getSide()), OrderKind.valueOf(order.getType()),
+				toLedgerSide(order.getSide()), OrderKind.valueOf(order.getType()),
 				OrderStatus.valueOf(order.getStatus()), BigDecimal.valueOf(order.getSize()), Price.of(order.getPrice()),
 				Optional.empty(), order.getDatetime());
 	}

@@ -3,7 +3,6 @@ package com.cocos.trading.service.submission;
 import static com.cocos.trading.service.submission.InvalidSubmissionException.refusing;
 
 import java.math.BigDecimal;
-import java.util.Optional;
 
 import com.cocos.trading.model.instrument.InstrumentRef;
 import com.cocos.trading.model.order.OrderKind;
@@ -26,23 +25,19 @@ final class RequestedSubmission {
 
 	private final BigDecimal limitPrice;
 
-	private final IdempotentRequest idempotent;
-
 	private RequestedSubmission(UserId userId, Integer instrumentIdColumn, OrderKind kind, OrderSide side,
-			TradeQuantity quantity, BigDecimal limitPrice, IdempotentRequest idempotent) {
+			TradeQuantity quantity, BigDecimal limitPrice) {
 		this.userId = userId;
 		this.instrumentIdColumn = instrumentIdColumn;
 		this.kind = kind;
 		this.side = side;
 		this.quantity = quantity;
 		this.limitPrice = limitPrice;
-		this.idempotent = idempotent;
 	}
 
 	static RequestedSubmission read(SubmissionRequest request) {
 		return new RequestedSubmission(new UserId(request.userId()), instrumentIdColumnOf(request.instrumentId()),
-				kindOf(request.type()), sideOf(request.side()), quantityOf(request), request.price(),
-				idempotentOf(request));
+				kindOf(request.type()), sideOf(request.side()), quantityOf(request), request.price());
 	}
 
 	UserId userId() {
@@ -51,10 +46,6 @@ final class RequestedSubmission {
 
 	Integer instrumentIdColumn() {
 		return instrumentIdColumn;
-	}
-
-	Optional<IdempotentRequest> idempotent() {
-		return Optional.ofNullable(idempotent);
 	}
 
 	Submission tradedAs(InstrumentRef instrument) {
@@ -97,10 +88,6 @@ final class RequestedSubmission {
 
 	private static TradeQuantity quantityOf(SubmissionRequest request) {
 		return refusing(() -> TradeQuantity.of(request.size(), request.amount()));
-	}
-
-	private static IdempotentRequest idempotentOf(SubmissionRequest request) {
-		return request.idempotencyKey() == null ? null : IdempotentRequest.of(request);
 	}
 
 }

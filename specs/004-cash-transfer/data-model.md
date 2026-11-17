@@ -114,7 +114,10 @@ submission's form is unchanged.
 
 ### `service/userwrite` (US4)
 
-Not a use case: no `@Service`, no endpoint. One `@Component` whose contract is:
+Not a use case: no `@Service`, no endpoint. Two orthogonal `@Component`s — `UserLock` (the row
+lock, then the work) and `IdempotentWrite` (claim, then attach / replay / conflict), neither aware
+of the other — and `UserWrite`, which composes them for the write endpoints. The contract of
+`UserWrite` is (ADR-0040):
 
 | Input | Meaning |
 |---|---|
@@ -129,7 +132,7 @@ Not a use case: no `@Service`, no endpoint. One `@Component` whose contract is:
 | the claim precedes the lock; the lock precedes the work | ADR-0036, ADR-0037 |
 | claimed → work, then the order attached to the key, same transaction | FR-015 |
 | not claimed → same fingerprint: the replay; different: conflict (`409`) | FR-015, FR-016 |
-| runs only inside the caller's transaction | a refused request rolls back its claim |
+| runs only inside the caller's transaction (each component checks it) | a refused request rolls back its claim |
 
 It owns the key type, the conflict exception and the hashing/comparison of a canonical form. Each use
 case owns its canonical form, its work and its replay.

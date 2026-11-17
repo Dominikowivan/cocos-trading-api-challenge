@@ -1,28 +1,19 @@
 package com.cocos.trading.service.submission;
 
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 import java.util.StringJoiner;
 
 import com.cocos.trading.model.DecimalPolicy;
+import com.cocos.trading.service.userwrite.Fingerprint;
 
-public record RequestFingerprint(String hex) {
-
-	private static final String ALGORITHM = "SHA-256";
+public record RequestFingerprint(String hex) implements Fingerprint {
 
 	private static final String FIELD_SEPARATOR = ";";
 
 	private static final String ABSENT = "";
 
 	public static RequestFingerprint of(SubmissionRequest request) {
-		return new RequestFingerprint(hashOf(canonicalFormOf(request)));
-	}
-
-	public boolean matches(String storedHex) {
-		return hex.equals(storedHex);
+		return new RequestFingerprint(Fingerprint.hashOf(canonicalFormOf(request)));
 	}
 
 	static String canonicalFormOf(SubmissionRequest request) {
@@ -43,19 +34,6 @@ public record RequestFingerprint(String hex) {
 
 	private static String scaled(BigDecimal amount) {
 		return amount == null ? ABSENT : DecimalPolicy.money(amount).toPlainString();
-	}
-
-	private static String hashOf(String canonicalForm) {
-		return HexFormat.of().formatHex(digestOf(canonicalForm));
-	}
-
-	private static byte[] digestOf(String canonicalForm) {
-		try {
-			return MessageDigest.getInstance(ALGORITHM).digest(canonicalForm.getBytes(StandardCharsets.UTF_8));
-		}
-		catch (NoSuchAlgorithmException unavailable) {
-			throw new IllegalStateException(ALGORITHM + " is required of every Java platform", unavailable);
-		}
 	}
 
 }

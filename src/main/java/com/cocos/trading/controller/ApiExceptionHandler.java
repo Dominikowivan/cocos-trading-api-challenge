@@ -17,8 +17,10 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 
 import com.cocos.trading.model.user.UnknownUserException;
 import com.cocos.trading.service.search.InvalidSearchRequestException;
-import com.cocos.trading.service.submission.IdempotencyConflictException;
 import com.cocos.trading.service.submission.InvalidSubmissionException;
+import com.cocos.trading.service.transfer.InvalidTransferException;
+import com.cocos.trading.service.userwrite.IdempotencyConflictException;
+import com.cocos.trading.service.userwrite.InvalidIdempotencyKeyException;
 
 @RestControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -41,6 +43,16 @@ class ApiExceptionHandler {
 		return problem(HttpStatus.BAD_REQUEST, exception.getMessage());
 	}
 
+	@ExceptionHandler(InvalidTransferException.class)
+	ProblemDetail invalidTransfer(InvalidTransferException exception) {
+		return problem(HttpStatus.BAD_REQUEST, exception.getMessage());
+	}
+
+	@ExceptionHandler(InvalidIdempotencyKeyException.class)
+	ProblemDetail invalidIdempotencyKey(InvalidIdempotencyKeyException exception) {
+		return problem(HttpStatus.BAD_REQUEST, exception.getMessage());
+	}
+
 	@ExceptionHandler(IdempotencyConflictException.class)
 	ProblemDetail idempotencyConflict(IdempotencyConflictException exception) {
 		return problem(HttpStatus.CONFLICT, exception.getMessage());
@@ -49,7 +61,7 @@ class ApiExceptionHandler {
 	@ExceptionHandler(HttpMessageNotReadableException.class)
 	ProblemDetail malformedBody(HttpMessageNotReadableException exception) {
 		log.debug("unreadable request body: {}", exception.getMessage());
-		return problem(HttpStatus.BAD_REQUEST, "The request body is not a readable order submission");
+		return problem(HttpStatus.BAD_REQUEST, "The request body is not readable JSON of the expected shape");
 	}
 
 	@ExceptionHandler(MissingServletRequestParameterException.class)
