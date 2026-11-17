@@ -1,0 +1,228 @@
+openapi: 3.1.0
+
+info:
+  title: Cocos Trading API — Cash Transfer (design-time proposal)
+  version: 0.1.0
+  description: |
+    The design-time proposal for the cash transfer endpoint of feature `004-cash-transfer`. It is
+    **not** the live contract: implementation applies this operation and its schemas to
+    `docs/api/openapi.yaml`, the one file every response in the web tests validates against
+    (ADR-0024), and adds the requests to `docs/api/trading-api.http`. This file is kept as it was
+    proposed and is not edited afterwards (constitution, *Technology and Scope Constraints*).
+
+    Requirement ids below (`FR-`, `SC-`, research `R-`) refer to `specs/004-cash-transfer/`.
+
+    Three rules shape this operation:
+
+    - **A rejected withdrawal is a recorded outcome, not a failure.** It is persisted `REJECTED`
+      with reason `INSUFFICIENT_FUNDS` and answered with `201`, exactly as an unaffordable order is
+      (ADR-0033, R-301). `400`, `404` and `409` mean nothing was written.
+    - **The body is closed.** It carries `side` and `amount` and nothing else; any other field is
+      refused with `400` (FR-004, R-305). Order submission, by contrast, ignores unknown fields.
+    - **Whole pesos.** The amount is a whole number from `1` to `2147483647`; `100.00` is one
+      hundred pesos, `100.50` is refused, never rounded (FR-003, R-304).
+
+servers:
+  - url: http://localhost:8080
+    description: Local development (docker compose database on port 5433)
+
+paths:
+  /api/v1/users/{userId}/cash-transfers:
+    post:
+      operationId: transferCash
+      summary: Deposit or withdraw pesos
+      description: |
+        Records one cash transfer for the user as one order in the ledger, on the `MONEDA`
+        instrument, with side `CASH_IN` or `CASH_OUT` (FR-006, R-303). A deposit is always
+        `FILLED`. A withdrawal is `FILLED` when the user's **available** cash — settled cash minus
+        what their `NEW` orders reserve, read from the same fold the portfolio endpoint reports — is
+        at least the amount, and `REJECTED` otherwise (FR-007 to FR-009).
+
+        Transfers and order submissions of one user are serialised with each other (FR-014). An
+        optional `Idempotency-Key` makes a retry return the first outcome; keys are scoped per user
+        and shared with order submission, so a key already used for an order is a `409` here
+        (FR-015, FR-016, R-310).
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: |
+            Caller-chosen, non-blank, at most 255 characters. The same key with the same body
+            returns the first outcome, `REJECTED` included; with a different body, or after being
+            used for an order, it is a `409`.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CashTransferRequest"
+            examples:
+              deposit:
+                summary: Deposit one hundred thousand pesos (US1 scenario 1)
+                value: { side: CASH_IN, amount: 100000 }
+              withdrawal:
+                summary: Withdraw exactly the available cash of user 1 (SC-002)
+                value: { side: CASH_OUT, amount: 627500 }
+      responses:
+        "201":
+          description: |
+            The transfer was recorded. Read `status` for the outcome: `FILLED`, or `REJECTED` with a
+            reason. A replayed idempotent request answers `201` with the first outcome.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CashTransfer"
+              examples:
+                filledDeposit:
+                  summary: A deposit for a user with no orders
+                  value:
+                    orderId: 12
+                    userId: 2
+                    side: CASH_IN
+                    amount: 100000.00
+                    status: FILLED
+                    rejectionReason: null
+                    transferredAt: "2026-11-17T15:04:05.123456"
+                rejectedWithdrawal:
+                  summary: User 1 withdrawing more than their available cash (SC-003)
+                  value:
+                    orderId: 13
+                    userId: 1
+                    side: CASH_OUT
+                    amount: 700000.00
+                    status: REJECTED
+                    rejectionReason: INSUFFICIENT_FUNDS
+                    transferredAt: "2026-11-17T15:04:06.654321"
+        "400":
+          description: |
+            Nothing was written. The side is not `CASH_IN` or `CASH_OUT`; the amount is missing,
+            not whole, below `1` or above `2147483647`; the body carries a field other than `side`
+            and `amount`; the key is blank or too long; or the body is not readable JSON.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+              examples:
+                orderSide:
+                  summary: An order's side on the transfer endpoint
+                  value:
+                    title: Bad Request
+                    status: 400
+                    detail: "Unknown side 'BUY': a cash transfer is CASH_IN or CASH_OUT"
+                    instance: /api/v1/users/1/cash-transfers
+                centavos:
+                  summary: An amount with centavos
+                  value:
+                    title: Bad Request
+                    status: 400
+                    detail: "A cash transfer is a whole number of pesos, and 100.50 is not"
+                    instance: /api/v1/users/1/cash-transfers
+                orderField:
+                  summary: A field that belongs to an order
+                  value:
+                    title: Bad Request
+                    status: 400
+                    detail: "A cash transfer carries only 'side' and 'amount', not 'instrumentId'"
+                    instance: /api/v1/users/1/cash-transfers
+        "404":
+          description: No user with that id. Nothing was written; a deposit does not create a user.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          description: |
+            The `Idempotency-Key` already names a different request of this user — another transfer
+            or an order. Nothing was written.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "503":
+          description: |
+            The transaction ran past its deadline, including while waiting for another transfer or
+            order of the same user, or no connection came free (ADR-0031). Nothing was written.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+
+components:
+  schemas:
+    CashTransferRequest:
+      type: object
+      additionalProperties: false
+      required: [side, amount]
+      properties:
+        side:
+          type: string
+          enum: [CASH_IN, CASH_OUT]
+        amount:
+          type: number
+          description: Whole pesos. `100` and `100.00` are the same amount.
+          minimum: 1
+          maximum: 2147483647
+
+    CashTransfer:
+      type: object
+      additionalProperties: false
+      required: [orderId, userId, side, amount, status, rejectionReason, transferredAt]
+      properties:
+        orderId:
+          type: integer
+          format: int64
+          description: The ledger order that records the transfer.
+        userId:
+          type: integer
+          format: int64
+        side:
+          type: string
+          enum: [CASH_IN, CASH_OUT]
+        amount:
+          type: number
+          description: Pesos at money scale (ADR-0016).
+        status:
+          type: string
+          enum: [FILLED, REJECTED]
+          description: A transfer is never `NEW`; it settles when it is recorded.
+        rejectionReason:
+          type: [string, "null"]
+          enum: [INSUFFICIENT_FUNDS, null]
+        transferredAt:
+          type: string
+          pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$'
+          description: |
+            When the server recorded the transfer; the caller sends no timestamp. A local date-time
+            with no offset, as the ledger's `datetime` column stores it — the same form as an
+            order's `submittedAt`.
+
+    Problem:
+      type: object
+      description: |
+        RFC 9457 problem detail, as the rest of the API already produces it. `type` is absent,
+        which RFC 9457 §3.1 defines as `about:blank`.
+      required: [title, status]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          default: about:blank
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference

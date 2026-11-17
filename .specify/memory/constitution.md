@@ -1,5 +1,25 @@
 <!--
 Sync Impact Report
+- Version change: 2.3.1 → 2.4.0 (MINOR: materially expanded guidance)
+- Modified principles:
+  - VIII. Layers — `service` may hold, besides one subpackage per use case, one subpackage of
+    shared write protections that is not a use case: no `@Service`, no endpoint, runs only inside
+    a use case's transaction; use cases may depend on it and it depends on none of them, enforced
+    by ArchUnit. Rationale extended. The rule that one use case does not depend on another is
+    unchanged
+- Modified sections:
+  - Technology and Scope Constraints — the endpoint list adds cash transfer
+- Added sections: none
+- Removed sections: none
+- Templates: not modified (they read this file at runtime)
+- Origin: feature `004-cash-transfer` (plan, R-311) and ADR-0040. The per-user lock and the
+  idempotency claim of order submission (ADR-0036, ADR-0037) are needed by a second use case, and
+  the author asked for them to live in one abstraction (`docs/journal/08CashTransfer.md`). Under
+  2.3.1 they could live neither in a use case's package (use cases are independent) nor at the
+  root of `service`. `ArchitectureTest` is adjusted in the change that creates the package
+- Deferred TODOs: none
+
+Previous report (2.3.1, 2026-11-17)
 - Version change: 2.3.0 → 2.3.1 (PATCH: wording; the rule itself is unchanged)
 - Modified principles:
   - IV. Order State Is Auditable and Race-Free — the parenthetical listing the machine-readable
@@ -282,6 +302,13 @@ decisions, so an ADR missing from it is an ADR nobody will read.
   concept (`model/portfolio`), keeping at its root only what every concept shares
   (`DecimalPolicy`). `controller` and `persistence` group by role (`dto`, `entity`, `mapper`). A
   subpackage that starts holding a second concept is split in the same change that adds it.
+- Besides the use cases, `service` MAY hold exactly one subpackage of shared write protections
+  (`service/userwrite`, ADR-0040): what every write endpoint needs before it may write — the
+  user's existence, the per-user lock, the idempotency claim. It is not a use case: it holds no
+  `@Service` and backs no endpoint, and it runs only inside the transaction of the use case that
+  calls it, never opening its own. Use cases MAY depend on it; it MUST NOT depend on any use case.
+  Only it takes the per-user lock and claims an idempotency key — enforced by ArchUnit. Anything
+  else two use cases share is not a reason to add to it.
 
 Rationale: the path of a request reads top to bottom in one service method, and principle V holds
 without test doubles because the model never reaches out. In 1.x (ports and adapters) model
@@ -289,7 +316,11 @@ objects fetched their own data through ports, which scattered the orchestration 
 See ADR-0017. Grouping a use case with its own request and response models means a reader opens
 one package and sees the whole use case, and the package list says what the system does rather
 than what kinds of classes it has; grouping by concept keeps a growing layer from turning into a
-bag of unrelated types that a reader has to sort before they can read it.
+bag of unrelated types that a reader has to sort before they can read it. The shared write
+protections are the one exception because they are orchestration — statements of a transaction in
+a required order — that every write needs identically: copied into each use case they drift, and
+pushed into persistence they would take orchestration out of the service. Naming the exception,
+and what may go in it, is what keeps it from becoming the catch-all this principle forbids.
 
 ### IX. Design for Change
 
@@ -322,7 +353,7 @@ nobody measured costs that readability and buys nothing anyone can show.
   an explicit version is allowed only for what the BOM does not manage.
 - PostgreSQL 18.7 in every environment: local, tests and staging.
 - The API is versioned under `/api/v1`. Its endpoints are portfolio, instrument search, order
-  submission and order cancellation. A new endpoint requires a spec and, if it had alternatives,
+  submission, cash transfer and order cancellation. A new endpoint requires a spec and, if it had alternatives,
   an ADR.
 - The API contract is `docs/api/openapi.yaml`, one file for the whole API, and every response in
   the web tests MUST validate against it (ADR-0024). A feature's `specs/NNN/contracts/` is its
@@ -374,4 +405,4 @@ nobody measured costs that readability and buys nothing anyone can show.
 - Compliance is checked at plan time (Constitution Check) and at review. Runtime guidance for
   developers lives in `README.md` and `docs/adr/`.
 
-**Version**: 2.3.1 | **Ratified**: 2026-11-15 | **Last Amended**: 2026-11-17
+**Version**: 2.4.0 | **Ratified**: 2026-11-15 | **Last Amended**: 2026-11-17
