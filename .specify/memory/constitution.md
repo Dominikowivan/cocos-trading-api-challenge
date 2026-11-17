@@ -1,5 +1,26 @@
 <!--
 Sync Impact Report
+- Version change: 2.3.0 → 2.3.1 (PATCH: wording; the rule itself is unchanged)
+- Modified principles:
+  - IV. Order State Is Auditable and Race-Free — the parenthetical listing the machine-readable
+    rejection reasons now names the three that can occur: no funds, no holdings, a derived size
+    below one share. "No price" is removed, and the derived-size reason, which the list never
+    named, is added. The requirement that every rejection record a reason is untouched
+- Modified sections: none
+- Added sections: none
+- Removed sections: none
+- Templates: not modified (they read this file at runtime)
+- Origin: ADR-0034 (accepted 2026-11-17) decided that a `MARKET` submission for an instrument
+  with no market price is refused with `400` and writes nothing, so it is no longer a recorded
+  rejection and the list named an outcome that cannot occur. No rejection ever lacked a reason,
+  so nothing was in violation. The conflict was flagged in the Constitution Check of
+  `specs/003-order-placement/plan.md` rather than resolved silently inside that feature's change,
+  as Governance requires it to be resolved. ADR-0005's `reason` column example names the same
+  stale list and is deliberately left as it is: an accepted ADR is never edited, and ADR-0034
+  cites it
+- Deferred TODOs: none
+
+Previous report (2.3.0, 2026-11-16)
 - Version change: 2.2.0 → 2.3.0 (MINOR: materially expanded guidance)
 - Modified principles:
   - VIII. Layers — no package becomes a catch-all: `service` is grouped by use case, each
@@ -182,7 +203,8 @@ code, and splits one rule across two languages.
 
 - Every order state transition MUST insert a row into `order_status_history` in the same
   transaction that updates `orders.status`. History rows are never updated or deleted.
-- A rejection MUST record a machine-readable reason (no funds, no holdings, no price).
+- A rejection MUST record a machine-readable reason (no funds, no holdings, a derived size below
+  one share).
 - Only `NEW` orders can be cancelled; cancelling MUST NOT release a reservation twice.
 - Reading available cash or holdings and inserting the order that consumes them MUST happen
   under a lock or a serialisable transaction, so two concurrent requests cannot both spend the
@@ -352,4 +374,4 @@ nobody measured costs that readability and buys nothing anyone can show.
 - Compliance is checked at plan time (Constitution Check) and at review. Runtime guidance for
   developers lives in `README.md` and `docs/adr/`.
 
-**Version**: 2.3.0 | **Ratified**: 2026-11-15 | **Last Amended**: 2026-11-16
+**Version**: 2.3.1 | **Ratified**: 2026-11-15 | **Last Amended**: 2026-11-17

@@ -2,12 +2,15 @@ package com.cocos.trading.persistence;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import com.cocos.trading.model.order.NewOrder;
 import com.cocos.trading.persistence.entity.OrderEntity;
+import com.cocos.trading.persistence.mapper.OrderMapper;
 
 public interface OrderRepository extends JpaRepository<OrderEntity, Integer> {
 
@@ -17,5 +20,13 @@ public interface OrderRepository extends JpaRepository<OrderEntity, Integer> {
 			order by o.datetime asc, o.id asc
 			""")
 	List<OrderEntity> findOrdersOf(@Param("userId") Integer userId, @Param("statuses") Collection<String> statuses);
+
+	default Optional<NewOrder> findPlacedOrder(Integer orderId) {
+		return findById(orderId).map(OrderMapper::toPlacedOrder);
+	}
+
+	default Integer append(NewOrder order) {
+		return save(OrderMapper.toNewOrder(order)).getId();
+	}
 
 }

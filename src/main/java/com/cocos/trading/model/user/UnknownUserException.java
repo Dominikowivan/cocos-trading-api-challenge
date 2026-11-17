@@ -1,6 +1,4 @@
-package com.cocos.trading.service.portfolio;
-
-import com.cocos.trading.model.user.UserId;
+package com.cocos.trading.model.user;
 
 public class UnknownUserException extends RuntimeException {
 

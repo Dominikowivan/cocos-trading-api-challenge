@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 
 import com.cocos.trading.model.instrument.InstrumentRef;
 
-public record Order(long orderId, InstrumentRef instrument, OrderSide side, OrderStatus status, OrderKind kind,
+public record Order(long orderId, InstrumentRef instrument, LedgerSide side, OrderStatus status, OrderKind kind,
 		BigDecimal quantity, BigDecimal price, LocalDateTime occurredAt) {
 
 	public boolean isSettled() {

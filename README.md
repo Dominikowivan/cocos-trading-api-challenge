@@ -136,14 +136,36 @@ The build fails on unformatted code. To format it:
 ./mvnw spring-javaformat:apply
 ```
 
+**The functional test the statement asks for** — *"un test funcional sobre la función para enviar
+una orden"* — **is the end-to-end suite.** The web tests under
+`src/test/java/com/cocos/trading/controller/` submit orders over HTTP against a real PostgreSQL
+through Testcontainers ([ADR-0010](docs/adr/0010-testcontainers-with-postgresql-18.md)), with every
+response validated against `docs/api/openapi.yaml`
+([ADR-0024](docs/adr/0024-every-response-is-validated-against-the-contract.md)). They cover all four
+submission paths, every refusal and every rejection, the two-thread concurrency race and the
+idempotent retry — the requested test, and more. The expected figures and how to reproduce them by
+hand are in [specs/003-order-placement/quickstart.md](specs/003-order-placement/quickstart.md).
+
 ## Endpoints
 
 | Method | Path | What it does |
 |---|---|---|
 | `GET` | `/api/v1/users/{userId}/portfolio` | Total account value, cash available to trade, and one entry per position with quantity, market value and total return |
 | `GET` | `/api/v1/instruments/search?query={text}` | One page of the instruments matching the text by ticker or name — partial and case-insensitive, ordered by ticker, never pesos (cash is not a tradable asset), each carrying its latest close and the day's move. Accents must be typed as they are stored: `río` finds *Molinos Río de la Plata*, `rio` does not (3 of 66 names; their tickers always match; `unaccent` considered and deferred, ADR-0027). Optional `page` and `size` |
-| `POST` | `/api/v1/orders` | Submits an order. `MARKET` fills immediately at the last close; `LIMIT` is accepted as `NEW` |
-| `POST` | `/api/v1/orders/{orderId}/cancel` | Cancels an order that is still `NEW` |
+| `POST` | `/api/v1/users/{userId}/orders` | Submits one order, by an exact `size` or by a total `amount` in pesos — exactly one of the two — from which whole shares are derived by flooring, never a fraction. `MARKET` fills immediately at the last close; `LIMIT` is validated at the caller's own price and accepted as `NEW`, reserving the pesos or the shares it commits. An order the user cannot pay for, or whose shares they do not hold, is **stored** `REJECTED` with a machine-readable reason and answered `201`, like the other two: a rejection is a recorded outcome, a malformed request is not (ADR-0033). Submissions for one user are serialised on their `users` row, so two simultaneous orders cannot spend the same pesos ([ADR-0036](docs/adr/0036-submissions-are-serialised-per-user.md)). An optional `Idempotency-Key` header makes a retry of the same request return the first outcome instead of trading twice, without taking that lock at all; the same key with a different body is a `409` ([ADR-0037](docs/adr/0037-idempotent-submission-with-a-caller-key.md)) |
+| `POST` | `/api/v1/users/{userId}/orders/{orderId}/cancel` | Cancels an order that is still `NEW` |
+
+## One departure from the statement
+
+**A `MARKET` order for an instrument with no published price is refused with `400` and nothing is
+written, instead of being stored as a `REJECTED` order** ([ADR-0034](docs/adr/0034-an-unpriced-instrument-refuses-the-submission.md)).
+Three instruments in the provided dataset have no `marketdata` row (`PGR`, `IRCP`, and `ARS`, which
+is cash and refused anyway), and a `MARKET` order for one of them has no execution price to record.
+An instrument that does not quote is a property of the request, knowable before any of the user's
+money is considered — so refusing it keeps every row in `orders` priced and never writes a money
+figure as `0` when it is unknown ([ADR-0013](docs/adr/0013-unknown-money-is-absent-never-zero.md)).
+Every other rejection the statement asks for is stored. A `LIMIT` order for the same instrument is
+accepted: its price came in the request.
 
 ## Two things this API deliberately does not do
 

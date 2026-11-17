@@ -5,6 +5,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
+import com.cocos.trading.model.instrument.Closes;
 import com.cocos.trading.model.DecimalPolicy;
 import com.cocos.trading.model.ledger.AccountSnapshot;
 import com.cocos.trading.model.ledger.Holding;
@@ -46,7 +47,7 @@ public record Portfolio(BigDecimal settledCash, BigDecimal availableCash, List<P
 
 	private static Position positionOf(Holding holding, Closes closes) {
 		Optional<BigDecimal> marketValue = closes.of(holding.instrument())
-			.map(close -> DecimalPolicy.money(holding.quantity().multiply(close)));
+			.map(close -> DecimalPolicy.money(close.times(holding.quantity())));
 		return new Position(holding.instrument(), holding.quantity(), marketValue,
 				marketValue.flatMap(value -> totalReturnPercentOf(holding, value)));
 	}

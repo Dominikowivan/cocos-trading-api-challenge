@@ -55,6 +55,20 @@ class ArchitectureTest {
 		.resideInAnyPackage("java..", MODEL);
 
 	@ArchTest
+	static final ArchRule the_model_names_no_framework_type = noClasses().that()
+		.resideInAPackage(MODEL)
+		.should()
+		.dependOnClassesThat()
+		.resideInAnyPackage("org.springframework..", "jakarta..", "org.hibernate..");
+
+	@ArchTest
+	static final ArchRule the_model_reads_no_clock = noClasses().that()
+		.resideInAPackage(MODEL)
+		.should()
+		.dependOnClassesThat()
+		.haveFullyQualifiedName("java.time.Clock");
+
+	@ArchTest
 	static final ArchRule each_service_lives_in_its_use_case_package = classes().that()
 		.areAnnotatedWith(Service.class)
 		.should()
@@ -75,6 +89,13 @@ class ArchitectureTest {
 		.should()
 		.dependOnClassesThat()
 		.areAnnotatedWith(Entity.class);
+
+	@ArchTest
+	static final ArchRule entity_types_stay_in_persistence = noClasses().that()
+		.resideOutsideOfPackage(PERSISTENCE)
+		.should()
+		.dependOnClassesThat()
+		.resideInAPackage("com.cocos.trading.persistence.entity..");
 
 	@ArchTest
 	static final ArchRule only_services_open_transactions_on_classes = noClasses().that()
