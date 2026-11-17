@@ -1,5 +1,7 @@
 package com.cocos.trading.persistence;
 
+import java.util.List;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -11,6 +13,8 @@ import com.cocos.trading.model.instrument.InstrumentRef;
 import com.cocos.trading.persistence.entity.InstrumentEntity;
 
 public interface InstrumentRepository extends JpaRepository<InstrumentEntity, Integer> {
+
+	List<InstrumentEntity> findByType(String type);
 
 	default Page<InstrumentEntity> searchNonCash(String text, Pageable pageable) {
 		Pageable unsorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());

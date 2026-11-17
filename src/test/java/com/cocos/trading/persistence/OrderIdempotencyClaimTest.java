@@ -27,10 +27,6 @@ class OrderIdempotencyClaimTest extends PersistenceTestBase {
 
 	private static final String ANOTHER_FINGERPRINT = "b".repeat(64);
 
-	private static final int FIRST_CALLER = 1;
-
-	private static final int ALREADY_CLAIMED = 0;
-
 	@Autowired
 	private OrderIdempotencyRepository orderIdempotencyRepository;
 
@@ -47,8 +43,8 @@ class OrderIdempotencyClaimTest extends PersistenceTestBase {
 
 	@Test
 	void the_first_caller_claims_the_key_and_the_second_does_not() {
-		assertThat(inOneTransaction(() -> claim(SEEDED_USER, A_KEY, A_FINGERPRINT))).isEqualTo(FIRST_CALLER);
-		assertThat(inOneTransaction(() -> claim(SEEDED_USER, A_KEY, ANOTHER_FINGERPRINT))).isEqualTo(ALREADY_CLAIMED);
+		assertThat(inOneTransaction(() -> claim(SEEDED_USER, A_KEY, A_FINGERPRINT))).isTrue();
+		assertThat(inOneTransaction(() -> claim(SEEDED_USER, A_KEY, ANOTHER_FINGERPRINT))).isFalse();
 		assertThat(claims()).isEqualTo(1);
 	}
 
@@ -80,8 +76,8 @@ class OrderIdempotencyClaimTest extends PersistenceTestBase {
 
 	@Test
 	void the_same_key_for_two_users_is_two_independent_rows() {
-		assertThat(inOneTransaction(() -> claim(SEEDED_USER, A_KEY, A_FINGERPRINT))).isEqualTo(FIRST_CALLER);
-		assertThat(inOneTransaction(() -> claim(ANOTHER_USER, A_KEY, ANOTHER_FINGERPRINT))).isEqualTo(FIRST_CALLER);
+		assertThat(inOneTransaction(() -> claim(SEEDED_USER, A_KEY, A_FINGERPRINT))).isTrue();
+		assertThat(inOneTransaction(() -> claim(ANOTHER_USER, A_KEY, ANOTHER_FINGERPRINT))).isTrue();
 
 		assertThat(fingerprintOf(SEEDED_USER, A_KEY)).contains(A_FINGERPRINT);
 		assertThat(fingerprintOf(ANOTHER_USER, A_KEY)).contains(ANOTHER_FINGERPRINT);
@@ -93,7 +89,7 @@ class OrderIdempotencyClaimTest extends PersistenceTestBase {
 		assertThat(fingerprintOf(SEEDED_USER, "never-sent")).isEmpty();
 	}
 
-	private Integer claim(Integer userId, String key, String fingerprint) {
+	private Boolean claim(Integer userId, String key, String fingerprint) {
 		return orderIdempotencyRepository.claim(userId, key, fingerprint, LocalDateTime.now());
 	}
 

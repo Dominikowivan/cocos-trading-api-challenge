@@ -47,3 +47,6 @@ currently holds; the journal is the authority on how it was reached.**
 | [0035](0035-a-price-is-a-type-and-only-a-priced-submission-decides.md) | A price is a type, and only a priced submission can decide | Accepted |
 | [0036](0036-submissions-are-serialised-per-user.md) | Submissions are serialised per user by a pessimistic lock on their `users` row | Accepted |
 | [0037](0037-idempotent-submission-with-a-caller-key.md) | An idempotent submission is a caller key, a fingerprint and `INSERT … ON CONFLICT DO NOTHING` | Accepted |
+| [0038](0038-the-cash-transfer-endpoint-shape.md) | One cash transfer endpoint under the user, with its own response and a closed body | Accepted |
+| [0039](0039-a-transfer-is-a-market-order-on-the-cash-instrument.md) | A transfer is a `MARKET` order on the `MONEDA` instrument at price `1`, in whole pesos | Accepted |
+| [0040](0040-per-user-write-protection-lives-once.md) | The per-user write protection lives once, in `service/userwrite` | Accepted |

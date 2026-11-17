@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 
+import com.cocos.trading.model.instrument.InstrumentRef;
 import com.cocos.trading.persistence.entity.InstrumentEntity;
 
 class InstrumentRepositoryTest extends PersistenceTestBase {
@@ -18,8 +19,18 @@ class InstrumentRepositoryTest extends PersistenceTestBase {
 
 	private static final int PAMP = 47;
 
+	private static final int ARS = 66;
+
 	@Autowired
 	private InstrumentRepository instrumentRepository;
+
+	@Test
+	void the_only_cash_instrument_is_ars() {
+		assertThat(instrumentRepository.findByType(InstrumentRef.CASH)).singleElement().satisfies(cash -> {
+			assertThat(cash.getId()).isEqualTo(ARS);
+			assertThat(cash.getTicker()).isEqualTo("ARS");
+		});
+	}
 
 	@Test
 	void a_ticker_matches_in_any_case() {

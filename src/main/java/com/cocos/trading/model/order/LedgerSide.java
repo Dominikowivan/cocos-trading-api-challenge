@@ -12,4 +12,6 @@ public sealed interface LedgerSide permits OrderSide, CashMovement {
 
 	BigDecimal positionSign();
 
+	String name();
+
 }

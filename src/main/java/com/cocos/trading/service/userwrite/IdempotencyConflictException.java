@@ -1,4 +1,4 @@
-package com.cocos.trading.service.submission;
+package com.cocos.trading.service.userwrite;
 
 public class IdempotencyConflictException extends RuntimeException {
 

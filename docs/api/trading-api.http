@@ -9,8 +9,8 @@
 # Response contract, enforced by the web tests (ADR-0024):
 #   docs/api/openapi.yaml
 #
-# The portfolio, instrument search and order submission sections are below; cancellation gets
-# its own as that feature lands.
+# The portfolio, instrument search, order submission and cash transfer sections are below;
+# cancellation gets its own as that feature lands.
 #
 # The submission requests at the end of this file **write to the ledger**, so their figures hold
 # from the seeded state. To get back to it: docker compose down -v, then up again (the dataset is
@@ -298,3 +298,72 @@ Content-Type: application/json
 Idempotency-Key: 7c9e6679-7425-40de-944b-e07fc1f90ae7
 
 {"instrumentId": 47, "type": "MARKET", "side": "BUY", "size": 1}
+
+###############################################################################
+# Cash transfer — POST /api/v1/users/{userId}/cash-transfers
+#
+# A deposit (CASH_IN) or a withdrawal (CASH_OUT) of whole pesos, recorded as one MARKET order on
+# ARS at price 1 (ADR-0039). Every recorded outcome answers 201, a REJECTED withdrawal included;
+# a request that writes nothing answers 400, 404 or 409 (ADR-0038). The body is closed: any field
+# besides side and amount is refused.
+# Expected figures: specs/004-cash-transfer/quickstart.md
+#
+# These requests change user 2's account. Run them from the seeded state, in this order.
+###############################################################################
+
+### Deposit — a user with no orders (US1 scenario 1)
+# 201. side CASH_IN, amount 100000.00, status FILLED, rejectionReason null. User 2's portfolio then
+# reports settled and available cash 100000.00.
+POST {{host}}/api/v1/users/2/cash-transfers
+Content-Type: application/json
+
+{"side": "CASH_IN", "amount": 100000}
+
+### Withdrawal — one peso more than is available (US1 scenario 8)
+# 201 with status REJECTED and rejectionReason INSUFFICIENT_FUNDS. The withdrawal **is** stored,
+# and the cash does not move.
+POST {{host}}/api/v1/users/2/cash-transfers
+Content-Type: application/json
+
+{"side": "CASH_OUT", "amount": 100001}
+
+### Withdrawal — exactly what is available (US1 scenario 2)
+# 201, status FILLED. User 2's cash is back to 0.00.
+POST {{host}}/api/v1/users/2/cash-transfers
+Content-Type: application/json
+
+{"side": "CASH_OUT", "amount": 100000}
+
+### A keyed deposit — the first request with a key (US3, FR-015)
+# 201, status FILLED. Note the orderId: the next request returns this same one.
+POST {{host}}/api/v1/users/2/cash-transfers
+Content-Type: application/json
+Idempotency-Key: dep-1
+
+{"side": "CASH_IN", "amount": 100000}
+
+### The same deposit again with the same key — the retry, not a second deposit
+# 201 with the **same** orderId; user 2's cash is 100000.00, not 200000.00. 100000.00 is the same
+# amount as 100000, so it is the same request.
+POST {{host}}/api/v1/users/2/cash-transfers
+Content-Type: application/json
+Idempotency-Key: dep-1
+
+{"side": "CASH_IN", "amount": 100000.00}
+
+### The same key with a different transfer — a conflict (FR-016)
+# 409 application/problem+json. Nothing is written. A key already used for an order of this user
+# answers the same way: keys are one namespace per user across both endpoints.
+POST {{host}}/api/v1/users/2/cash-transfers
+Content-Type: application/json
+Idempotency-Key: dep-1
+
+{"side": "CASH_OUT", "amount": 100000}
+
+### A refusal — a field that belongs to an order (FR-004)
+# 400, detail "A cash transfer carries only 'side' and 'amount', not 'instrumentId'". Nothing is
+# written; order submission, by contrast, ignores fields it does not know.
+POST {{host}}/api/v1/users/2/cash-transfers
+Content-Type: application/json
+
+{"side": "CASH_IN", "amount": 100, "instrumentId": 66}
