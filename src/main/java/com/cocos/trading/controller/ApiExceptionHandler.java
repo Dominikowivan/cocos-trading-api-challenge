@@ -16,6 +16,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import com.cocos.trading.model.user.UnknownUserException;
+import com.cocos.trading.service.cancellation.InvalidCancellationException;
+import com.cocos.trading.service.cancellation.OrderNotCancellableException;
+import com.cocos.trading.service.cancellation.UnknownOrderException;
 import com.cocos.trading.service.search.InvalidSearchRequestException;
 import com.cocos.trading.service.submission.InvalidSubmissionException;
 import com.cocos.trading.service.transfer.InvalidTransferException;
@@ -46,6 +49,21 @@ class ApiExceptionHandler {
 	@ExceptionHandler(InvalidTransferException.class)
 	ProblemDetail invalidTransfer(InvalidTransferException exception) {
 		return problem(HttpStatus.BAD_REQUEST, exception.getMessage());
+	}
+
+	@ExceptionHandler(InvalidCancellationException.class)
+	ProblemDetail invalidCancellation(InvalidCancellationException exception) {
+		return problem(HttpStatus.BAD_REQUEST, exception.getMessage());
+	}
+
+	@ExceptionHandler(UnknownOrderException.class)
+	ProblemDetail unknownOrder(UnknownOrderException exception) {
+		return problem(HttpStatus.NOT_FOUND, exception.getMessage());
+	}
+
+	@ExceptionHandler(OrderNotCancellableException.class)
+	ProblemDetail orderNotCancellable(OrderNotCancellableException exception) {
+		return problem(HttpStatus.CONFLICT, exception.getMessage());
 	}
 
 	@ExceptionHandler(InvalidIdempotencyKeyException.class)

@@ -1,6 +1,6 @@
 package com.cocos.trading.service.userwrite;
 
-public interface AppendedOrder {
+public interface WrittenOrder {
 
 	long orderId();
 

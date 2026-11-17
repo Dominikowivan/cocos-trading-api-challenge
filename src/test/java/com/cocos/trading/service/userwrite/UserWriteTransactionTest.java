@@ -50,12 +50,12 @@ class UserWriteTransactionTest {
 		assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM order_idempotency", Long.class)).isZero();
 	}
 
-	private static AppendedOrder workDone(AtomicBoolean worked) {
+	private static WrittenOrder workDone(AtomicBoolean worked) {
 		worked.set(true);
 		return nothingRecorded();
 	}
 
-	private static AppendedOrder nothingRecorded() {
+	private static WrittenOrder nothingRecorded() {
 		return () -> 0;
 	}
 

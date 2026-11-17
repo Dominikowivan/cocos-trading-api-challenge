@@ -79,7 +79,7 @@ class IdempotentWriteTest {
 					.orderId());
 	}
 
-	private static AppendedOrder appended(AtomicInteger worked) {
+	private static WrittenOrder appended(AtomicInteger worked) {
 		worked.incrementAndGet();
 		return () -> A_SEEDED_ORDER;
 	}
