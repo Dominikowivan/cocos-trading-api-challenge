@@ -98,6 +98,13 @@ export COCOS_DB_PASSWORD="<password>"
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=staging
 ```
 
+**Staging has been run once, on 2026-11-18.** Flyway found the provided schema with no history,
+recorded it as version 1 and applied V2 to V6 on top. Then the three read-only folders of the
+Postman collection — service, portfolio and search, 24 requests and 62 assertions — passed against
+it with the same figures as the local dataset. The three folders that write were left out on
+purpose: they would leave test orders in the database being evaluated, and unlike the local one it
+cannot be reset.
+
 ## Development
 
 To work on the code, run only the database in Docker and the API from the IDE or the Maven wrapper:
