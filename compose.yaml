@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:18.7-alpine
+    container_name: trading-api-db
+    environment:
+      POSTGRES_DB: trading
+      POSTGRES_USER: trading
+      POSTGRES_PASSWORD: trading
+    ports:
+      - "5433:5432"
+    volumes:
+      - trading-api-db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trading -d trading"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    profiles: [app]
+    build: .
+    container_name: trading-api
+    environment:
+      - SPRING_PROFILES_ACTIVE=local
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/trading
+      - SPRING_DATA_WEB_PAGEABLE_DEFAULT_PAGE_SIZE
+      - SPRING_DATA_WEB_PAGEABLE_MAX_PAGE_SIZE
+      - TRADING_SEARCH_MAX_QUERY_LENGTH
+      - SPRING_TRANSACTION_DEFAULT_TIMEOUT
+      - TRADING_DB_LOCK_TIMEOUT
+      - SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE
+      - SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  trading-api-db-data:

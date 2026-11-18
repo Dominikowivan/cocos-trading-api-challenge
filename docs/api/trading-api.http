@@ -1,0 +1,423 @@
+### Cocos Trading API — example requests
+#
+# The statement's optional "collection for Postman, Insomnia or REST Client" (research R-023).
+# Runs as-is in IntelliJ's HTTP Client and in the VS Code REST Client extension.
+#
+# Prerequisites: docker compose --profile app up --build
+# Expected figures and the reasoning behind them:
+#   specs/001-portfolio-endpoint/quickstart.md
+# Response contract, enforced by the web tests (ADR-0024):
+#   docs/api/openapi.yaml
+#
+# The portfolio, instrument search, order submission, cash transfer and order cancellation
+# sections are below.
+#
+# The submission requests at the end of this file **write to the ledger**, so their figures hold
+# from the seeded state. To get back to it: docker compose down -v, then up again (the dataset is
+# a repeatable Flyway migration, ADR-0029).
+
+@host = http://localhost:8080
+@userId = 1
+
+### Portfolio — the seeded user
+# 200. settledCash 753000.00, availableCash 627500.00 (125500.00 reserved by two BUY LIMIT NEW
+# orders), totalAccountValue 889756.00. Positions, ticker ascending: BMA -10 / -15028.00 /
+# totalReturnPercent null, METR 500 / 114750.00 / -8.20, PAMP 40 / 37034.00 / -0.45.
+# No ARS position: pesos are cash, never a holding.
+# Side effect to check in the application log: exactly one ERROR naming BMA and -10 — the seeded
+# ledger really does hold a short position, and it is reported rather than hidden (ADR-0012).
+GET {{host}}/api/v1/users/{{userId}}/portfolio
+Accept: application/json
+
+### Portfolio — a user who has never traded
+# 200 with positions [], availableCash 0.00, settledCash 0.00, totalAccountValue 0.00.
+# Zeros, not nulls: those values are known (ADR-0013). Users 2, 3 and 4 have no orders in the seed.
+GET {{host}}/api/v1/users/2/portfolio
+Accept: application/json
+
+### Portfolio — an id that is not a user
+# 404 application/problem+json, title "Not Found", detail "User 999 does not exist".
+# Distinguishable from the request above: a wrong id is never served as a real account that has
+# never traded (FR-024).
+GET {{host}}/api/v1/users/999/portfolio
+Accept: application/json
+
+### Portfolio — a malformed id
+# 400 application/problem+json, title "Bad Request", detail
+# "Failed to convert 'userId' with value: 'abc'". The id is bound as a long, so this never
+# reaches the domain.
+GET {{host}}/api/v1/users/abc/portfolio
+Accept: application/json
+
+### Portfolio — two consecutive reads must agree
+# Same bytes as the first request, position order included, with no intervening order (SC-006).
+GET {{host}}/api/v1/users/{{userId}}/portfolio
+Accept: application/json
+
+### Instrument search — an exact ticker
+# 200. One result: instrumentId 47, PAMP, Pampa Holding S.A., ACCIONES.
+# page 0, size 20 (the configured default), totalElements 1, totalPages 1.
+GET {{host}}/api/v1/instruments/search?query=PAMP
+Accept: application/json
+
+### Instrument search — the same ticker in lower case
+# Identical body: matching folds case on both sides, in SQL (FR-004).
+GET {{host}}/api/v1/instruments/search?query=pamp
+Accept: application/json
+
+### Instrument search — a partial ticker
+# Identical results, "query": "pam". Containment, not prefix (FR-003).
+GET {{host}}/api/v1/instruments/search?query=pam
+Accept: application/json
+
+### Instrument search — surrounding whitespace is trimmed
+# Identical body to the request above, with "query": "pamp" (FR-007).
+GET {{host}}/api/v1/instruments/search?query=%20%20pamp%20%20
+Accept: application/json
+
+### Instrument search — nothing matched is not an error
+# 200 with "results": [] and "totalElements": 0. The search ran; nothing matched (FR-011, SC-010).
+GET {{host}}/api/v1/instruments/search?query=ZZZZ
+Accept: application/json
+
+### Instrument search — cash is never a result
+# 200 with an empty page. Pesos are the currency assets are paid in, not a tradable asset, and the
+# MONEDA type is excluded (FR-023, ADR-0027). "pesos" is empty for the same reason.
+GET {{host}}/api/v1/instruments/search?query=ars
+Accept: application/json
+
+### Instrument search — a whitespace-only query is rejected
+# 400 application/problem+json, detail "The search query must not be blank" (FR-008).
+# Contrast with ZZZZ above: there the search ran, here it never did.
+GET {{host}}/api/v1/instruments/search?query=%20%20
+Accept: application/json
+
+### Instrument search — a missing query parameter is rejected
+# 400 application/problem+json, detail "Required request parameter 'query' is not present".
+GET {{host}}/api/v1/instruments/search
+Accept: application/json
+
+### Instrument search — a name fragment returns the family
+# 200 with four results, ticker ascending: BBAR, BHIP, BMA, BPAT. All four match on their name
+# (FR-002). "BANCO" returns the identical list.
+GET {{host}}/api/v1/instruments/search?query=banco
+Accept: application/json
+
+### Instrument search — an accented name, typed with its accent
+# 200 with one result: MOLI, Molinos Río de la Plata.
+GET {{host}}/api/v1/instruments/search?query=r%C3%ADo
+Accept: application/json
+
+### Instrument search — the same name, typed without it
+# 200 with three results, BHIP, OEST and RICH, and no MOLI: accents are not folded (FR-005,
+# ADR-0027). MOLI is still reachable by its ticker or by "molinos".
+GET {{host}}/api/v1/instruments/search?query=rio
+Accept: application/json
+
+### Instrument search — a typo matches nothing
+# 200 with an empty page. "bnaco" is a transposition of "banco"; matching is literal and the API
+# does not guess (FR-024).
+GET {{host}}/api/v1/instruments/search?query=bnaco
+Accept: application/json
+
+### Instrument search — results come in ticker order
+# 200 with nine results, ticker ascending (FR-013, FR-014):
+#   AGRO  GCLA  GGAL  GRIM  LOMA  MOLA  OEST  PGR  SUPV
+GET {{host}}/api/v1/instruments/search?query=gr
+Accept: application/json
+
+### Instrument search — a broad query is paged and says how much there is
+# 200. page 0, size 20, totalElements 59, totalPages 3, 20 results ending at CVH.
+GET {{host}}/api/v1/instruments/search?query=a
+Accept: application/json
+
+### Instrument search — the second page
+# 200. 20 results, DGCU2 … MOLA. Nothing repeated from page 0, nothing skipped.
+GET {{host}}/api/v1/instruments/search?query=a&page=1
+Accept: application/json
+
+### Instrument search — the last page
+# 200. 19 results, MOLI … YPFD. 20 + 20 + 19 = 59.
+GET {{host}}/api/v1/instruments/search?query=a&page=2
+Accept: application/json
+
+### Instrument search — a page past the last one
+# 200 with "results": [] and "totalElements": 59 — an empty page, not an error. An overshooting
+# client learns the real total rather than a 404 (FR-015b).
+GET {{host}}/api/v1/instruments/search?query=a&page=3
+Accept: application/json
+
+### Instrument search — the whole result set in one page
+# 200. size 59, totalPages 1, 59 results. A client that wants everything can ask, up to the
+# configured maximum.
+GET {{host}}/api/v1/instruments/search?query=a&size=59
+Accept: application/json
+
+### Instrument search — a size above the configured maximum is clamped
+# 200 with "size": 100, the maximum in force, echoed so the caller sees what they got (ADR-0032).
+GET {{host}}/api/v1/instruments/search?query=a&size=500
+Accept: application/json
+
+### Instrument search — a negative page is read as the first one
+# 200 with "page": 0 (ADR-0032).
+GET {{host}}/api/v1/instruments/search?query=a&page=-1
+Accept: application/json
+
+### Instrument search — a sort sent by the caller is ignored
+# 200, same order as without it: ticker, then id (ADR-0027, ADR-0032).
+GET {{host}}/api/v1/instruments/search?query=gr&sort=name,desc
+Accept: application/json
+
+### Instrument search — an instrument with no price is still an instrument
+# 200. instrumentId 3, PGR, with "close": null and "dailyReturnPercent": null — never 0
+# (ADR-0013). Prices are looked up after the match, so a missing one cannot drop the instrument.
+# PGR and IRCP are the two searchable instruments with no marketdata row.
+GET {{host}}/api/v1/instruments/search?query=pgr
+Accept: application/json
+
+### Instrument search — a known zero is a different answer from an unknown one
+# 200. AGRO carries "close": 138.00 and "dailyReturnPercent": 0.00 — it closed flat on
+# 2023-07-14. Contrast with PGR above, whose figures are null because they are unknown.
+GET {{host}}/api/v1/instruments/search?query=agro
+Accept: application/json
+
+###############################################################################
+# Order submission — POST /api/v1/users/{userId}/orders
+#
+# Every recorded outcome answers 201, FILLED, NEW and REJECTED alike, because all three appended
+# a row to the ledger (ADR-0033). A request that writes nothing answers 400, 404 or 409.
+# Expected figures: specs/003-order-placement/quickstart.md
+#
+# These requests change the account. Run them from the seeded state, in this order.
+###############################################################################
+
+### MARKET BUY by size — the exact share count (SC-001)
+# 201. status FILLED, size 100, price 925.85 (PAMP's latest close), rejectionReason null.
+# Available cash falls from 627500.00 to 534915.00: check with the portfolio request above.
+POST {{host}}/api/v1/users/{{userId}}/orders
+Content-Type: application/json
+
+{"instrumentId": 47, "type": "MARKET", "side": "BUY", "size": 100}
+
+### MARKET BUY by amount — pesos, not shares (SC-004)
+# 201. status FILLED, size 108 — floor(100000.00 / 925.85) — moving 99991.80. The unspent 8.20
+# is neither spent nor an error (FR-017). The derived size is reported on the order.
+POST {{host}}/api/v1/users/{{userId}}/orders
+Content-Type: application/json
+
+{"instrumentId": 47, "type": "MARKET", "side": "BUY", "amount": 100000.00}
+
+### LIMIT BUY by size — validated at the caller's price, never against the market (SC-006)
+# 201. status NEW, price 900.00, no fill. It reserves 90000.00 of available cash while settled
+# cash stays put, so a second order cannot commit the same pesos twice.
+POST {{host}}/api/v1/users/{{userId}}/orders
+Content-Type: application/json
+
+{"instrumentId": 47, "type": "LIMIT", "side": "BUY", "size": 100, "price": 900.00}
+
+### LIMIT SELL by amount — the price substitutes on both sides (SC-005)
+# 201. status NEW, size 30 — 30000.00 at the caller's own 1000.00 — and not the 32 the same
+# amount yields at the 925.85 close. The holding is valued at the price the caller named.
+POST {{host}}/api/v1/users/{{userId}}/orders
+Content-Type: application/json
+
+{"instrumentId": 47, "type": "LIMIT", "side": "SELL", "amount": 30000.00, "price": 1000.00}
+
+### A recorded rejection — the user cannot pay for it (FR-019, SC-002)
+# 201 with status REJECTED and rejectionReason INSUFFICIENT_FUNDS. The order **is** stored, with
+# its price and its requested size, and no figure in the portfolio moves.
+POST {{host}}/api/v1/users/{{userId}}/orders
+Content-Type: application/json
+
+{"instrumentId": 47, "type": "MARKET", "side": "BUY", "size": 1000}
+
+### A refusal — a MARKET order for an instrument that does not quote (SC-009, ADR-0034)
+# 400 application/problem+json, detail "Instrument 3 (PGR) has no market price, so a MARKET order
+# has no execution price". Nothing is written. This is the one departure from the challenge
+# statement, and the README says so.
+POST {{host}}/api/v1/users/{{userId}}/orders
+Content-Type: application/json
+
+{"instrumentId": 3, "type": "MARKET", "side": "BUY", "size": 1}
+
+### The same instrument as a LIMIT order is accepted (FR-011)
+# 201 with status NEW. Naming your own price is the honest request for something the market has
+# not priced; a limit order never reads market data.
+POST {{host}}/api/v1/users/{{userId}}/orders
+Content-Type: application/json
+
+{"instrumentId": 3, "type": "LIMIT", "side": "BUY", "size": 1, "price": 100.00}
+
+### A refusal — a MARKET order carrying a price (FR-005)
+# 400, detail "A MARKET order executes at the latest close and takes no price". Refused, never
+# silently ignored.
+POST {{host}}/api/v1/users/{{userId}}/orders
+Content-Type: application/json
+
+{"instrumentId": 47, "type": "MARKET", "side": "BUY", "size": 10, "price": 900.00}
+
+### A refusal — an unknown user (FR-007)
+# 404, detail "User 99999 does not exist". The target of the request is a user's order collection.
+POST {{host}}/api/v1/users/99999/orders
+Content-Type: application/json
+
+{"instrumentId": 47, "type": "MARKET", "side": "BUY", "size": 1}
+
+### An idempotent submission — the first request with a key (SC-011, FR-028)
+# 201. Note the orderId: the next request returns this same one.
+POST {{host}}/api/v1/users/{{userId}}/orders
+Content-Type: application/json
+Idempotency-Key: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+
+{"instrumentId": 47, "type": "MARKET", "side": "BUY", "size": 5}
+
+### The same request again with the same key — the retry, not a second order
+# 201 with the **same** orderId, status and submittedAt as above, and one order in the ledger:
+# the portfolio shows the cash moved once. Whitespace and key order do not matter — the
+# fingerprint is taken over the parsed request (ADR-0037).
+POST {{host}}/api/v1/users/{{userId}}/orders
+Content-Type: application/json
+Idempotency-Key: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+
+{  "side" : "BUY", "type":"MARKET",   "size": 5.00, "instrumentId" : 47 }
+
+### The same key with a different body — a conflict
+# 409 application/problem+json: the key already names a different request for this user (FR-029).
+# Nothing is written, and the earlier order is not disclosed.
+POST {{host}}/api/v1/users/{{userId}}/orders
+Content-Type: application/json
+Idempotency-Key: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+
+{"instrumentId": 47, "type": "MARKET", "side": "BUY", "size": 7}
+
+### The same key sent by another user — a new request (FR-030)
+# 201. Keys are scoped per user, so this is processed on its own merits: user 2 has never traded,
+# so it is a recorded REJECTED / INSUFFICIENT_FUNDS.
+POST {{host}}/api/v1/users/2/orders
+Content-Type: application/json
+Idempotency-Key: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+
+{"instrumentId": 47, "type": "MARKET", "side": "BUY", "size": 1}
+
+###############################################################################
+# Cash transfer — POST /api/v1/users/{userId}/cash-transfers
+#
+# A deposit (CASH_IN) or a withdrawal (CASH_OUT) of whole pesos, recorded as one MARKET order on
+# ARS at price 1 (ADR-0039). Every recorded outcome answers 201, a REJECTED withdrawal included;
+# a request that writes nothing answers 400, 404 or 409 (ADR-0038). The body is closed: any field
+# besides side and amount is refused.
+# Expected figures: specs/004-cash-transfer/quickstart.md
+#
+# These requests change user 2's account. Run them from the seeded state, in this order.
+###############################################################################
+
+### Deposit — a user with no orders (US1 scenario 1)
+# 201. side CASH_IN, amount 100000.00, status FILLED, rejectionReason null. User 2's portfolio then
+# reports settled and available cash 100000.00.
+POST {{host}}/api/v1/users/2/cash-transfers
+Content-Type: application/json
+
+{"side": "CASH_IN", "amount": 100000}
+
+### Withdrawal — one peso more than is available (US1 scenario 8)
+# 201 with status REJECTED and rejectionReason INSUFFICIENT_FUNDS. The withdrawal **is** stored,
+# and the cash does not move.
+POST {{host}}/api/v1/users/2/cash-transfers
+Content-Type: application/json
+
+{"side": "CASH_OUT", "amount": 100001}
+
+### Withdrawal — exactly what is available (US1 scenario 2)
+# 201, status FILLED. User 2's cash is back to 0.00.
+POST {{host}}/api/v1/users/2/cash-transfers
+Content-Type: application/json
+
+{"side": "CASH_OUT", "amount": 100000}
+
+### A keyed deposit — the first request with a key (US3, FR-015)
+# 201, status FILLED. Note the orderId: the next request returns this same one.
+POST {{host}}/api/v1/users/2/cash-transfers
+Content-Type: application/json
+Idempotency-Key: dep-1
+
+{"side": "CASH_IN", "amount": 100000}
+
+### The same deposit again with the same key — the retry, not a second deposit
+# 201 with the **same** orderId; user 2's cash is 100000.00, not 200000.00. 100000.00 is the same
+# amount as 100000, so it is the same request.
+POST {{host}}/api/v1/users/2/cash-transfers
+Content-Type: application/json
+Idempotency-Key: dep-1
+
+{"side": "CASH_IN", "amount": 100000.00}
+
+### The same key with a different transfer — a conflict (FR-016)
+# 409 application/problem+json. Nothing is written. A key already used for an order of this user
+# answers the same way: keys are one namespace per user across both endpoints.
+POST {{host}}/api/v1/users/2/cash-transfers
+Content-Type: application/json
+Idempotency-Key: dep-1
+
+{"side": "CASH_OUT", "amount": 100000}
+
+### A refusal — a field that belongs to an order (FR-004)
+# 400, detail "A cash transfer carries only 'side' and 'amount', not 'instrumentId'". Nothing is
+# written; order submission, by contrast, ignores fields it does not know.
+POST {{host}}/api/v1/users/2/cash-transfers
+Content-Type: application/json
+
+{"side": "CASH_IN", "amount": 100, "instrumentId": 66}
+
+###############################################################################
+# Order cancellation — POST /api/v1/users/{userId}/orders/{orderId}/cancel
+#
+# Moves one NEW order of the user to CANCELLED, with the reason USER_REQUESTED in its history; no
+# body. 200 with the order; 404 for a missing or foreign order, with the same detail; 409 for an
+# order that is not NEW (ADR-0041). What the order reserved is available again in the next
+# portfolio read; settled cash does not move.
+# Expected figures: specs/005-order-cancellation/quickstart.md
+#
+# These requests change user 1's orders 5 and 7. Run them from the seeded state, in this order.
+###############################################################################
+
+### Cancel a pending buy (scenario 1, SC-001)
+# 200. orderId 5, LOMA, LIMIT, BUY, size 50, price 710.00, status CANCELLED, rejectionReason null.
+POST {{host}}/api/v1/users/{{userId}}/orders/5/cancel
+
+### The reservation is released (scenario 1)
+# 200. availableCash 663000.00 (35500.00 more than before), settledCash still 753000.00.
+GET {{host}}/api/v1/users/{{userId}}/portfolio
+Accept: application/json
+
+### Cancel the same order again — no longer NEW (scenario 3)
+# 409, detail "Order 5 is CANCELLED; only a NEW order can be cancelled". Nothing is written.
+POST {{host}}/api/v1/users/{{userId}}/orders/5/cancel
+
+### Cancel an order that was filled (scenario 3)
+# 409, detail "Order 2 is FILLED; only a NEW order can be cancelled".
+POST {{host}}/api/v1/users/{{userId}}/orders/2/cancel
+
+### Cancel someone else's order (scenario 4, FR-004)
+# 404, detail "Order 7 does not exist for user 2" — the same answer as an order that does not
+# exist. Order 7 stays NEW.
+POST {{host}}/api/v1/users/2/orders/7/cancel
+
+### Cancel an order that does not exist (scenario 4)
+# 404, detail "Order 999 does not exist for user 2".
+POST {{host}}/api/v1/users/2/orders/999/cancel
+
+### A keyed cancellation — the first request with a key (scenario 6, FR-012)
+# 200, order 7 CANCELLED. availableCash is now 753000.00: nothing is reserved any more.
+POST {{host}}/api/v1/users/{{userId}}/orders/7/cancel
+Idempotency-Key: cancel-7
+
+### The same cancellation again with the same key — the retry, not a 409
+# 200 with the same order, CANCELLED. Still one CANCELLED history row for order 7.
+POST {{host}}/api/v1/users/{{userId}}/orders/7/cancel
+Idempotency-Key: cancel-7
+
+### The same key for a different order — a conflict (FR-013)
+# 409, detail naming the key. Keys are one namespace per user across submission, transfer and
+# cancellation.
+POST {{host}}/api/v1/users/{{userId}}/orders/5/cancel
+Idempotency-Key: cancel-7
