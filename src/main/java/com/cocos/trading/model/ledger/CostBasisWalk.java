@@ -11,10 +11,10 @@ public final class CostBasisWalk {
 	private BigDecimal averageCost = BigDecimal.ZERO;
 
 	public void accept(BigDecimal signedQuantity, BigDecimal price) {
-		if (quantity.signum() == 0) {
+		if (isFlat(quantity)) {
 			open(signedQuantity, price);
 		}
-		else if (quantity.signum() == signedQuantity.signum()) {
+		else if (sameDirection(quantity, signedQuantity)) {
 			extend(signedQuantity, price);
 		}
 		else {
@@ -46,10 +46,10 @@ public final class CostBasisWalk {
 	private void reduce(BigDecimal signedQuantity, BigDecimal price) {
 		BigDecimal remaining = quantity.add(signedQuantity);
 
-		if (remaining.signum() == 0) {
+		if (isFlat(remaining)) {
 			close();
 		}
-		else if (remaining.signum() == quantity.signum()) {
+		else if (sameDirection(remaining, quantity)) {
 			quantity = remaining;
 		}
 		else {
@@ -64,6 +64,14 @@ public final class CostBasisWalk {
 
 	private void crossZero(BigDecimal remaining, BigDecimal price) {
 		open(remaining, price);
+	}
+
+	private static boolean isFlat(BigDecimal quantity) {
+		return quantity.signum() == 0;
+	}
+
+	private static boolean sameDirection(BigDecimal one, BigDecimal other) {
+		return one.signum() == other.signum();
 	}
 
 }
