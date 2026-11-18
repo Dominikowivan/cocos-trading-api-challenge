@@ -40,8 +40,9 @@ class OrderIdempotencySchemaTest extends PersistenceTestBase {
 	@Test
 	void two_claims_cannot_name_the_same_order() {
 		jdbcTemplate.update(claimOf(SEEDED_USER, "'first-key'", SEEDED_ORDER));
+		String aSecondKeyNamingTheSameOrder = claimOf(SEEDED_USER, "'second-key'", SEEDED_ORDER);
 
-		assertThatThrownBy(() -> jdbcTemplate.execute(claimOf(SEEDED_USER, "'second-key'", SEEDED_ORDER)))
+		assertThatThrownBy(() -> jdbcTemplate.execute(aSecondKeyNamingTheSameOrder))
 			.isInstanceOf(DataIntegrityViolationException.class);
 	}
 

@@ -1,6 +1,5 @@
 package com.cocos.trading.controller.submission;
 
-import static com.cocos.trading.controller.ApiPaths.CANCEL;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
