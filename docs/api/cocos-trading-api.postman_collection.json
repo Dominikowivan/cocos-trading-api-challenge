@@ -1,0 +1,3380 @@
+{
+  "info": {
+    "_postman_id": "0b0a1f4e-6d2a-4c3b-9f71-2a4c8d5e7b10",
+    "name": "Cocos Trading API",
+    "description": "A hands-on tour of the Cocos trading API: a portfolio read, instrument search, order submission,\ncash transfers and order cancellation, with the happy paths first in each folder and then the\nedge cases and errors that are worth seeing.\n\n### Running it\n\n1. Start the stack: `docker compose --profile app up --build`, and wait for the app to be healthy.\n2. Check the `baseUrl` variable below (`http://localhost:8080` by default).\n3. Run folder **0** to confirm the service answers, then go through the folders in order.\n\nEvery request carries a short note on what it is showing and a handful of tests, so the\nCollection Runner gives you a pass/fail sweep of the whole API in one go.\n\n### What the figures assume\n\nFolders 0 to 2 are read-only and can be re-run freely. Folders 3 to 5 **write**: their requests\nare ordered, and the numbers they assert follow from running them once against the freshly\nseeded dataset. To get back to that state:\n\n```\ndocker compose down -v\ndocker compose --profile app up --build\n```\n\nWithout a reset, a second pass will fail on the figures (and on the cancellations, which can\nonly happen once) - that is the state having moved, not the API misbehaving.\n\n### Conventions worth knowing before you start\n\n* **A rejection is an outcome, not an error.** An order or withdrawal the account cannot cover\n  is *stored* with status `REJECTED` and a machine-readable reason, and answered `201`. A request\n  that could not be acted on at all writes nothing and comes back `400`, `404` or `409`.\n* **`null` means unknown, `0` means zero.** A figure the API cannot know - the price of an\n  instrument that does not quote, the return on a negative position - is `null`, never `0`.\n* **Errors are `application/problem+json`** with a `title`, `status` and a `detail` that names\n  the rule that refused the request.\n* **`Idempotency-Key` is optional on every write.** Repeating a request with the same key\n  returns the first outcome instead of acting again; reusing a key for a *different* request is\n  a `409`. Keys are scoped per user and shared across all three write endpoints.\n* **There is no authentication.** The user id in the path is taken at face value, which is why\n  the \"someone else's order\" case below is about user isolation only.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "0. Service",
+      "description": "A first call to confirm the API is listening before anything else runs.",
+      "item": [
+        {
+          "name": "The service is up",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ]
+            },
+            "description": "If this fails, nothing below will run. Start the stack with\n`docker compose --profile app up --build` and wait for the app container to report healthy."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Reports UP\", function () {",
+                  "    pm.expect(pm.response.json().status).to.eql(\"UP\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Portfolio",
+      "description": "`GET /api/v1/users/{userId}/portfolio` — what the user owns and what they can spend.\n\nRead-only: these requests can be run in any order, as often as you like, and the figures\nasserted here are the ones of the freshly seeded dataset.",
+      "item": [
+        {
+          "name": "The seeded user",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}/portfolio",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}",
+                "portfolio"
+              ]
+            },
+            "description": "The happy path.\n\n`settledCash` is the accounting balance; `availableCash` is what can be spent right now, which\nis lower because two pending limit buys are holding pesos. The difference between the two is\nexactly what those pending orders commit, so the response reconciles on its own:\n`totalAccountValue` = `settledCash` + the sum of every position's `marketValue`.\n\nPositions come in ticker order. Pesos are cash, never a position, so there is no ARS row.\n\nWorth a look at the application log while this runs: the seeded ledger holds a short position\n(BMA, -10), and it is reported as a negative quantity rather than hidden."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "var p = pm.response.json();",
+                  "",
+                  "pm.test(\"Cash figures of the seeded account\", function () {",
+                  "    pm.expect(p.settledCash).to.eql(753000.00);",
+                  "    pm.expect(p.availableCash).to.eql(627500.00);",
+                  "    pm.expect(p.totalAccountValue).to.eql(889756.00);",
+                  "});",
+                  "",
+                  "pm.test(\"Pending buy orders hold 125500.00 of the settled cash\", function () {",
+                  "    pm.expect(p.settledCash - p.availableCash).to.eql(125500.00);",
+                  "});",
+                  "",
+                  "pm.test(\"The response reconciles: settled cash + market values = total\", function () {",
+                  "    var sum = p.positions.reduce(function (acc, pos) { return acc + pos.marketValue; }, 0);",
+                  "    pm.expect(Number((p.settledCash + sum).toFixed(2))).to.eql(p.totalAccountValue);",
+                  "});",
+                  "",
+                  "pm.test(\"Three positions, in ticker order\", function () {",
+                  "    pm.expect(p.positions.map(function (x) { return x.ticker; })).to.eql([\"BMA\", \"METR\", \"PAMP\"]);",
+                  "});",
+                  "",
+                  "pm.test(\"Pesos are cash, not a position\", function () {",
+                  "    pm.expect(p.positions.map(function (x) { return x.ticker; })).to.not.include(\"ARS\");",
+                  "});",
+                  "",
+                  "pm.test(\"A short position is reported, not hidden\", function () {",
+                  "    var bma = p.positions[0];",
+                  "    pm.expect(bma.quantity).to.eql(-10);",
+                  "    pm.expect(bma.marketValue).to.eql(-15028.00);",
+                  "    pm.expect(bma.totalReturnPercent).to.be.null;",
+                  "});",
+                  "",
+                  "pm.test(\"A long position carries its return on the user's own cost\", function () {",
+                  "    var pamp = p.positions[2];",
+                  "    pm.expect(pamp.quantity).to.eql(40);",
+                  "    pm.expect(pamp.marketValue).to.eql(37034.00);",
+                  "    pm.expect(pamp.totalReturnPercent).to.eql(-0.45);",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set(\"portfolioSnapshot\", pm.response.text());"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "The same read again agrees, byte for byte",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}/portfolio",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}",
+                "portfolio"
+              ]
+            },
+            "description": "Nothing was traded in between, so the answer must be identical to the previous request —\nposition order included. A portfolio read that drifts between two calls is a bug.\n\nRun this one right after the request above."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Identical to the previous read\", function () {",
+                  "    pm.expect(pm.response.text()).to.eql(pm.collectionVariables.get(\"portfolioSnapshot\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A user who has never traded",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/2/portfolio",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "2",
+                "portfolio"
+              ]
+            },
+            "description": "An empty account is a valid account: 200, no positions, and zeros.\n\nThe zeros are the point. These values are *known* to be zero, so they are reported as `0.00`\nrather than as `null`, which the API keeps for figures it genuinely does not know."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "var p = pm.response.json();",
+                  "",
+                  "pm.test(\"No positions\", function () { pm.expect(p.positions).to.eql([]); });",
+                  "",
+                  "pm.test(\"Known zeros, not nulls\", function () {",
+                  "    pm.expect(p.settledCash).to.eql(0.00);",
+                  "    pm.expect(p.availableCash).to.eql(0.00);",
+                  "    pm.expect(p.totalAccountValue).to.eql(0.00);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "An id that is not a user",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/999/portfolio",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "999",
+                "portfolio"
+              ]
+            },
+            "description": "The edge case that matters next to the request above: a wrong id must not be served as a real\naccount that happens to be empty. One is a 404, the other a 200 full of zeros."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 Not Found\", function () { pm.response.to.have.status(404); });",
+                  "",
+                  "pm.test(\"Answers application/problem+json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});",
+                  "",
+                  "pm.test(\"Says which user\", function () {",
+                  "    pm.expect(pm.response.json().detail).to.include(\"999\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A malformed user id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/abc/portfolio",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "abc",
+                "portfolio"
+              ]
+            },
+            "description": "`abc` is not an id at all. It is refused at the edge with a 400 and never reaches the domain —\na malformed request is not a missing user."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", function () { pm.response.to.have.status(400); });",
+                  "",
+                  "pm.test(\"Answers application/problem+json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Instrument search",
+      "description": "`GET /api/v1/instruments/search?query=...` - find something to trade.\n\nRead-only, so run these in any order. `query` is required; `page` and `size` are optional.\nThe response always says which page you got, how big it is and how many instruments matched in\ntotal, so a client knows what it has not seen yet.",
+      "item": [
+        {
+          "name": "An exact ticker",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/instruments/search?query=PAMP",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "instruments",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "PAMP"
+                }
+              ]
+            },
+            "description": "The happy path. One match, and it carries the `instrumentId` that the order endpoint takes, so\nyou can go from a search straight to an order without a second lookup.\n\n`size` 20 is the deployment's default page size, echoed back so it is visible without a\nsettings endpoint."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "var r = pm.response.json();",
+                  "",
+                  "pm.test(\"One match: PAMP, id 47\", function () {",
+                  "    pm.expect(r.results).to.have.lengthOf(1);",
+                  "    pm.expect(r.results[0].instrumentId).to.eql(47);",
+                  "    pm.expect(r.results[0].ticker).to.eql(\"PAMP\");",
+                  "    pm.expect(r.results[0].name).to.eql(\"Pampa Holding S.A.\");",
+                  "    pm.expect(r.results[0].type).to.eql(\"ACCIONES\");",
+                  "});",
+                  "",
+                  "pm.test(\"Carries a price and the daily move\", function () {",
+                  "    pm.expect(r.results[0].close).to.eql(925.85);",
+                  "    pm.expect(r.results[0].dailyReturnPercent).to.be.a(\"number\");",
+                  "});",
+                  "",
+                  "pm.test(\"Page metadata: page 0, default size 20, 1 match\", function () {",
+                  "    pm.expect(r.page).to.eql(0);",
+                  "    pm.expect(r.size).to.eql(20);",
+                  "    pm.expect(r.totalElements).to.eql(1);",
+                  "    pm.expect(r.totalPages).to.eql(1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A partial ticker, in lower case",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/instruments/search?query=pam",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "instruments",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "pam"
+                }
+              ]
+            },
+            "description": "Matching folds case and looks for the fragment anywhere in the value, not only at the start.\nSame instrument as the request above."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Finds PAMP from a lower-case fragment\", function () {",
+                  "    var r = pm.response.json();",
+                  "    pm.expect(r.query).to.eql(\"pam\");",
+                  "    pm.expect(r.results.map(function (x) { return x.ticker; })).to.eql([\"PAMP\"]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Surrounding whitespace is trimmed",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/instruments/search?query=%20%20pamp%20%20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "instruments",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "%20%20pamp%20%20"
+                }
+              ]
+            },
+            "description": "A query arriving with spaces around it is trimmed before it is searched, and the response echoes\nwhat was actually searched: `pamp`, not `  pamp  `."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Searched the trimmed query, and says so\", function () {",
+                  "    var r = pm.response.json();",
+                  "    pm.expect(r.query).to.eql(\"pamp\");",
+                  "    pm.expect(r.results.map(function (x) { return x.ticker; })).to.eql([\"PAMP\"]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A name fragment returns the whole family",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/instruments/search?query=banco",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "instruments",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "banco"
+                }
+              ]
+            },
+            "description": "Search looks at names too, not only tickers. None of these four tickers contains \"banco\" -\nall four match on their name."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test(\"Matches, in ticker order: BBAR BHIP BMA BPAT\", function () {",
+                  "    pm.expect(pm.response.json().results.map(function (x) { return x.ticker; }))",
+                  "      .to.eql([\"BBAR\", \"BHIP\", \"BMA\", \"BPAT\"]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "An accented name, typed with the accent",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/instruments/search?query=r%C3%ADo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "instruments",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "r%C3%ADo"
+                }
+              ]
+            },
+            "description": "The accented query finds Molinos Rio de la Plata (spelled with the accent in the dataset).\nCompare with the next request."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Finds MOLI by its accented name\", function () {",
+                  "    var r = pm.response.json();",
+                  "    pm.expect(r.results.map(function (x) { return x.ticker; })).to.eql([\"MOLI\"]);",
+                  "    pm.expect(r.results[0].name).to.include(\"Molinos\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "The same name, typed without the accent",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/instruments/search?query=rio",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "instruments",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "rio"
+                }
+              ]
+            },
+            "description": "Accents are **not** folded, so the unaccented query is a different query: MOLI is absent here,\nand the matches are three other instruments whose names contain a plain \"rio\".\n\nA deliberate trade-off rather than an oversight - MOLI stays reachable by its ticker or by\n\"molinos\". Worth knowing if you expected accent-insensitive search."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test(\"Matches, in ticker order: BHIP OEST RICH\", function () {",
+                  "    pm.expect(pm.response.json().results.map(function (x) { return x.ticker; }))",
+                  "      .to.eql([\"BHIP\", \"OEST\", \"RICH\"]);",
+                  "});",
+                  "",
+                  "pm.test(\"MOLI is not here: accents are not folded\", function () {",
+                  "    pm.expect(pm.response.json().results.map(function (x) { return x.ticker; }))",
+                  "      .to.not.include(\"MOLI\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Results come in ticker order",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/instruments/search?query=gr",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "instruments",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "gr"
+                }
+              ]
+            },
+            "description": "The order is deterministic - ticker ascending - so paging is stable and two identical requests\nnever shuffle their results."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test(\"Matches, in ticker order: AGRO GCLA GGAL GRIM LOMA MOLA OEST PGR SUPV\", function () {",
+                  "    pm.expect(pm.response.json().results.map(function (x) { return x.ticker; }))",
+                  "      .to.eql([\"AGRO\", \"GCLA\", \"GGAL\", \"GRIM\", \"LOMA\", \"MOLA\", \"OEST\", \"PGR\", \"SUPV\"]);",
+                  "});",
+                  "",
+                  "pm.test(\"Sorted, checked independently of the expected list\", function () {",
+                  "    var t = pm.response.json().results.map(function (x) { return x.ticker; });",
+                  "    pm.expect(t).to.eql(t.slice().sort());",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Nothing matched is not an error",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/instruments/search?query=ZZZZ",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "instruments",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "ZZZZ"
+                }
+              ]
+            },
+            "description": "The search ran and found nothing, which is an answer, not a failure: 200 with an empty list and\na total of 0. Contrast with the rejected queries at the end of this folder, where the search\nnever ran at all."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"An empty page, and it says the total is 0\", function () {",
+                  "    var r = pm.response.json();",
+                  "    pm.expect(r.results).to.eql([]);",
+                  "    pm.expect(r.totalElements).to.eql(0);",
+                  "    pm.expect(r.totalPages).to.eql(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A typo matches nothing",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/instruments/search?query=bnaco",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "instruments",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "bnaco"
+                }
+              ]
+            },
+            "description": "\"bnaco\" is \"banco\" with two letters swapped. Matching is literal: the API does not guess at what\nyou meant, it tells you nothing matched."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"No results\", function () {",
+                  "    pm.expect(pm.response.json().results).to.eql([]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cash is never a search result",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/instruments/search?query=ars",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "instruments",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "ars"
+                }
+              ]
+            },
+            "description": "Pesos are the currency instruments are paid in, not something you can buy, so the ARS row is\nexcluded from search. \"pesos\" comes back empty for the same reason."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"ARS is not offered as tradable\", function () {",
+                  "    var r = pm.response.json();",
+                  "    pm.expect(r.results).to.eql([]);",
+                  "    pm.expect(r.totalElements).to.eql(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "An instrument with no price is still an instrument",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/instruments/search?query=pgr",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "instruments",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "pgr"
+                }
+              ]
+            },
+            "description": "PGR has no market data. It is still returned - prices are looked up after the match, so a\nmissing price can never make an instrument disappear - with `close` and `dailyReturnPercent`\nas `null`.\n\n`null`, not `0`: the price is unknown, and that is a different statement from \"it is zero\"."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"PGR is returned with unknown figures as null\", function () {",
+                  "    var i = pm.response.json().results.filter(function (x) { return x.ticker === \"PGR\"; })[0];",
+                  "    pm.expect(i.instrumentId).to.eql(3);",
+                  "    pm.expect(i.ticker).to.eql(\"PGR\");",
+                  "    pm.expect(i.close).to.be.null;",
+                  "    pm.expect(i.dailyReturnPercent).to.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A known zero is a different answer from an unknown one",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/instruments/search?query=agro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "instruments",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "agro"
+                }
+              ]
+            },
+            "description": "The counterpart to PGR. AGRO closed flat, so its daily return is a real, measured `0.00` and its\nclose is a real number. Neither is `null`, because neither is unknown.\n\n(Two instruments match here - Molinos Agro comes along for the ride.)"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"A measured zero is reported as 0.00\", function () {",
+                  "    var i = pm.response.json().results.filter(function (x) { return x.ticker === \"AGRO\"; })[0];",
+                  "    pm.expect(i.close).to.eql(138.00);",
+                  "    pm.expect(i.dailyReturnPercent).to.eql(0.00);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A broad query is paged, and says how much there is",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/instruments/search?query=a",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "instruments",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "a"
+                }
+              ]
+            },
+            "description": "59 instruments match. You get the first 20 and the total, which is what lets a client decide\nwhether to keep asking."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"First page of 59 matches across 3 pages\", function () {",
+                  "    var r = pm.response.json();",
+                  "    pm.expect(r.page).to.eql(0);",
+                  "    pm.expect(r.size).to.eql(20);",
+                  "    pm.expect(r.results).to.have.lengthOf(20);",
+                  "    pm.expect(r.totalElements).to.eql(59);",
+                  "    pm.expect(r.totalPages).to.eql(3);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "The last page",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/instruments/search?query=a&page=2",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "instruments",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "a"
+                },
+                {
+                  "key": "page",
+                  "value": "2"
+                }
+              ]
+            },
+            "description": "19 results: 20 + 20 + 19 = 59. Nothing repeated from the earlier pages, nothing skipped."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"The tail of the result set\", function () {",
+                  "    var r = pm.response.json();",
+                  "    pm.expect(r.page).to.eql(2);",
+                  "    pm.expect(r.results).to.have.lengthOf(19);",
+                  "    pm.expect(r.totalElements).to.eql(59);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A page past the last one",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/instruments/search?query=a&page=3",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "instruments",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "a"
+                },
+                {
+                  "key": "page",
+                  "value": "3"
+                }
+              ]
+            },
+            "description": "An empty page, not a 404. A client that overshoots learns the real total instead of an error."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Empty page, real total\", function () {",
+                  "    var r = pm.response.json();",
+                  "    pm.expect(r.results).to.eql([]);",
+                  "    pm.expect(r.totalElements).to.eql(59);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A page size above the maximum is clamped, not refused",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/instruments/search?query=a&size=500",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "instruments",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "a"
+                },
+                {
+                  "key": "size",
+                  "value": "500"
+                }
+              ]
+            },
+            "description": "Asking for 500 results gets you the maximum the deployment allows - 100 - and the response says\n`size: 100` so you can see what you actually got. A negative `page` is corrected to 0 the same\nway. Out-of-range paging is normalised rather than rejected."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Clamped to the maximum in force, and echoed\", function () {",
+                  "    var r = pm.response.json();",
+                  "    pm.expect(r.size).to.eql(100);",
+                  "    pm.expect(r.totalElements).to.eql(59);",
+                  "    pm.expect(r.results).to.have.lengthOf(59);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A blank query is rejected",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/instruments/search?query=%20%20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "instruments",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "%20%20"
+                }
+              ]
+            },
+            "description": "Two spaces trim to nothing, so there is no query to run. 400 - and note the difference from the\n\"ZZZZ\" request: there the search ran and matched nothing, here it never ran."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", function () { pm.response.to.have.status(400); });",
+                  "",
+                  "pm.test(\"Answers application/problem+json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});",
+                  "",
+                  "pm.test(\"Says the query must not be blank\", function () {",
+                  "    pm.expect(pm.response.json().detail.toLowerCase()).to.include(\"blank\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A missing query parameter is rejected",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/instruments/search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "instruments",
+                "search"
+              ]
+            },
+            "description": "`query` is required. Without it there is nothing to search for."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", function () { pm.response.to.have.status(400); });",
+                  "",
+                  "pm.test(\"Answers application/problem+json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});",
+                  "",
+                  "pm.test(\"Names the missing parameter\", function () {",
+                  "    pm.expect(pm.response.json().detail).to.include(\"query\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Order submission",
+      "description": "`POST /api/v1/users/{userId}/orders` - buy or sell.\n\n**These requests write.** They are ordered, they assume the freshly seeded dataset, and the\nfigures asserted below follow from running them top to bottom exactly once. To start over:\n`docker compose down -v` and bring the stack up again.\n\nThe two shapes to keep in mind:\n\n* a `MARKET` order executes at the instrument's latest close and comes back `FILLED`;\n* a `LIMIT` order is validated at the price *you* name, comes back `NEW`, and holds what it\n  commits - pesos for a buy, shares for a sell - until it is cancelled. Nothing ever fills it:\n  there is no matching engine.\n\nAnd the distinction worth checking first: an order the user cannot afford is a **recorded\noutcome**, so it is stored `REJECTED` and answered `201`. A request that cannot be acted on at\nall writes nothing and is answered `400`, `404` or `409`.",
+      "item": [
+        {
+          "name": "A market buy, by share count",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}",
+                "orders"
+              ]
+            },
+            "description": "The happy path: 100 shares at whatever PAMP last closed at.\n\nYou get the execution price back, so you know what you paid without a second call.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"instrumentId\": 47, \"type\": \"MARKET\", \"side\": \"BUY\", \"size\": 100}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", function () { pm.response.to.have.status(201); });",
+                  "",
+                  "var o = pm.response.json();",
+                  "",
+                  "pm.test(\"Filled at the latest close\", function () {",
+                  "    pm.expect(o.status).to.eql(\"FILLED\");",
+                  "    pm.expect(o.type).to.eql(\"MARKET\");",
+                  "    pm.expect(o.side).to.eql(\"BUY\");",
+                  "    pm.expect(o.ticker).to.eql(\"PAMP\");",
+                  "    pm.expect(o.size).to.eql(100);",
+                  "    pm.expect(o.price).to.eql(925.85);",
+                  "});",
+                  "",
+                  "pm.test(\"No rejection reason on a filled order\", function () {",
+                  "    pm.expect(o.rejectionReason).to.be.null;",
+                  "});",
+                  "",
+                  "pm.test(\"Identifies itself\", function () {",
+                  "    pm.expect(o.orderId).to.be.a(\"number\");",
+                  "    pm.expect(o.userId).to.eql(1);",
+                  "    pm.expect(o.submittedAt).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "The portfolio reflects the fill",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}/portfolio",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}",
+                "portfolio"
+              ]
+            },
+            "description": "100 shares at 925.85 is 92,585.00, so available cash goes from 627,500.00 to 534,915.00 and the\nPAMP position grows from 40 shares to 140.\n\nRun this straight after the request above, from the seeded state."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Cash and holding moved by exactly the order\", function () {",
+                  "    var p = pm.response.json();",
+                  "    pm.expect(p.availableCash).to.eql(534915.00);",
+                  "    var pamp = p.positions.filter(function (x) { return x.ticker === \"PAMP\"; })[0];",
+                  "    pm.expect(pamp.quantity).to.eql(140);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A market buy, by amount in pesos",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}",
+                "orders"
+              ]
+            },
+            "description": "Same instrument, but expressed as \"spend up to 100,000.00\" instead of a share count.\n\n100,000.00 / 925.85 is 108.008..., so you get **108** shares and 99,991.80 moves. The amount is\na ceiling, not a target: the leftover 8.20 is neither spent nor an error, and no fraction of a\nshare is ever traded. The derived share count comes back on the order.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"instrumentId\": 47, \"type\": \"MARKET\", \"side\": \"BUY\", \"amount\": 100000.0}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", function () { pm.response.to.have.status(201); });",
+                  "pm.test(\"Derived 108 shares by flooring, not rounding\", function () {",
+                  "    var o = pm.response.json();",
+                  "    pm.expect(o.status).to.eql(\"FILLED\");",
+                  "    pm.expect(o.size).to.eql(108);",
+                  "    pm.expect(o.price).to.eql(925.85);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A limit buy holds the cash it commits",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}",
+                "orders"
+              ]
+            },
+            "description": "Validated against your 900.00, never against the market price, and left `NEW`.\n\nIt does not spend anything - settled cash does not move - but it reserves 90,000.00, which comes\noff `availableCash`. That is what stops two orders from committing the same pesos twice. Compare\nthe next portfolio read if you want to see it.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"instrumentId\": 47, \"type\": \"LIMIT\", \"side\": \"BUY\", \"size\": 100, \"price\": 900.0}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", function () { pm.response.to.have.status(201); });",
+                  "pm.test(\"Resting at the caller's price\", function () {",
+                  "    var o = pm.response.json();",
+                  "    pm.expect(o.status).to.eql(\"NEW\");",
+                  "    pm.expect(o.type).to.eql(\"LIMIT\");",
+                  "    pm.expect(o.size).to.eql(100);",
+                  "    pm.expect(o.price).to.eql(900.00);",
+                  "    pm.expect(o.rejectionReason).to.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A limit sell, by amount, at your own price",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}",
+                "orders"
+              ]
+            },
+            "description": "The interesting corner of amount-based sizing: 30,000.00 at the 1,000.00 *you* named derives\n**30** shares, not the 32 the same amount would buy at the 925.85 close.\n\nThe price in the request substitutes for the market price on both sides of the calculation.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"instrumentId\": 47, \"type\": \"LIMIT\", \"side\": \"SELL\", \"amount\": 30000.0, \"price\": 1000.0}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", function () { pm.response.to.have.status(201); });",
+                  "pm.test(\"Sized at the caller's price: 30 shares, not 32\", function () {",
+                  "    var o = pm.response.json();",
+                  "    pm.expect(o.status).to.eql(\"NEW\");",
+                  "    pm.expect(o.side).to.eql(\"SELL\");",
+                  "    pm.expect(o.size).to.eql(30);",
+                  "    pm.expect(o.price).to.eql(1000.00);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Not enough cash is recorded, not refused",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}",
+                "orders"
+              ]
+            },
+            "description": "1,000 PAMP costs more than the account has available.\n\nThe order **is stored**, with the price and the size that were asked for, as `REJECTED` with a\nmachine-readable reason - and answered `201`, because something was written. No figure in the\nportfolio moves.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"instrumentId\": 47, \"type\": \"MARKET\", \"side\": \"BUY\", \"size\": 1000}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", function () { pm.response.to.have.status(201); });",
+                  "pm.test(\"Stored as a rejection, with the reason\", function () {",
+                  "    var o = pm.response.json();",
+                  "    pm.expect(o.status).to.eql(\"REJECTED\");",
+                  "    pm.expect(o.rejectionReason).to.eql(\"INSUFFICIENT_FUNDS\");",
+                  "    pm.expect(o.orderId).to.be.a(\"number\");",
+                  "    pm.expect(o.size).to.eql(1000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Selling shares you do not hold is recorded too",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}",
+                "orders"
+              ]
+            },
+            "description": "The same treatment on the other side: a sell larger than the available holding is stored\n`REJECTED`, with a reason that says which constraint failed.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"instrumentId\": 47, \"type\": \"MARKET\", \"side\": \"SELL\", \"size\": 100000}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", function () { pm.response.to.have.status(201); });",
+                  "pm.test(\"Rejected for holdings, not for funds\", function () {",
+                  "    var o = pm.response.json();",
+                  "    pm.expect(o.status).to.eql(\"REJECTED\");",
+                  "    pm.expect(o.rejectionReason).to.eql(\"INSUFFICIENT_HOLDINGS\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A market order for an instrument that does not quote",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}",
+                "orders"
+              ]
+            },
+            "description": "PGR has no market price, so there is no price at which a market order could execute. Refused,\nand nothing is written.\n\nThis is a judgement call rather than an obvious rule - the alternative would be to invent a\nprice or to fill at zero - so the error says exactly why.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"instrumentId\": 3, \"type\": \"MARKET\", \"side\": \"BUY\", \"size\": 1}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", function () { pm.response.to.have.status(400); });",
+                  "",
+                  "pm.test(\"Answers application/problem+json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});",
+                  "",
+                  "pm.test(\"Explains that there is no execution price\", function () {",
+                  "    pm.expect(pm.response.json().detail).to.include(\"no market price\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "The same instrument as a limit order is fine",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}",
+                "orders"
+              ]
+            },
+            "description": "The counterpart to the request above. Naming your own price is the honest way to ask for\nsomething the market has not priced, and a limit order never reads market data at all.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"instrumentId\": 3, \"type\": \"LIMIT\", \"side\": \"BUY\", \"size\": 1, \"price\": 100.0}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", function () { pm.response.to.have.status(201); });",
+                  "pm.test(\"Accepted and left NEW\", function () {",
+                  "    var o = pm.response.json();",
+                  "    pm.expect(o.status).to.eql(\"NEW\");",
+                  "    pm.expect(o.ticker).to.eql(\"PGR\");",
+                  "    pm.expect(o.price).to.eql(100.00);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A market order carrying a price",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}",
+                "orders"
+              ]
+            },
+            "description": "A market order executes at the close and takes no price, so a request that sends one is\ncontradictory. It is refused rather than silently ignored - quietly dropping a field the caller\ncared about is how you end up with an order nobody meant to place.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"instrumentId\": 47, \"type\": \"MARKET\", \"side\": \"BUY\", \"size\": 10, \"price\": 900.0}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", function () { pm.response.to.have.status(400); });",
+                  "",
+                  "pm.test(\"Answers application/problem+json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});",
+                  "",
+                  "pm.test(\"Says a MARKET order takes no price\", function () {",
+                  "    pm.expect(pm.response.json().detail).to.include(\"price\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A limit order without a price",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}",
+                "orders"
+              ]
+            },
+            "description": "There is nothing to validate the order against and nothing to rest it at. 400, nothing written.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"instrumentId\": 47, \"type\": \"LIMIT\", \"side\": \"BUY\", \"size\": 10}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", function () { pm.response.to.have.status(400); });",
+                  "",
+                  "pm.test(\"Answers application/problem+json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Neither a size nor an amount",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}",
+                "orders"
+              ]
+            },
+            "description": "The quantity is **exactly one of** `size` (shares) or `amount` (pesos). With neither, there is\nno order to place.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"instrumentId\": 47, \"type\": \"MARKET\", \"side\": \"BUY\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", function () { pm.response.to.have.status(400); });",
+                  "",
+                  "pm.test(\"Answers application/problem+json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Both a size and an amount",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}",
+                "orders"
+              ]
+            },
+            "description": "The other half of \"exactly one of\": two quantities that could disagree are refused rather than\none of them being picked for you.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"instrumentId\": 47, \"type\": \"MARKET\", \"side\": \"BUY\", \"size\": 10, \"amount\": 10000.0}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", function () { pm.response.to.have.status(400); });",
+                  "",
+                  "pm.test(\"Answers application/problem+json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cash is not a tradable instrument",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}",
+                "orders"
+              ]
+            },
+            "description": "Instrument 66 is ARS - the pesos themselves. You cannot buy pesos with pesos, which is also why\nit never shows up in search or as a portfolio position. Deposits and withdrawals have their own\nendpoint, in the next folder.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"instrumentId\": 66, \"type\": \"MARKET\", \"side\": \"BUY\", \"size\": 1}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", function () { pm.response.to.have.status(400); });",
+                  "",
+                  "pm.test(\"Answers application/problem+json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});",
+                  "",
+                  "pm.test(\"Says it is cash\", function () {",
+                  "    pm.expect(pm.response.json().detail).to.include(\"cash\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "An unknown instrument",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}",
+                "orders"
+              ]
+            },
+            "description": "Nothing to trade. 400, nothing written.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"instrumentId\": 999999, \"type\": \"MARKET\", \"side\": \"BUY\", \"size\": 1}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", function () { pm.response.to.have.status(400); });",
+                  "",
+                  "pm.test(\"Answers application/problem+json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "An unknown user",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/99999/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "99999",
+                "orders"
+              ]
+            },
+            "description": "The target of the request is a user's order collection, and that user does not exist. 404, not\n400: the body was fine, the address was not.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"instrumentId\": 47, \"type\": \"MARKET\", \"side\": \"BUY\", \"size\": 1}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 Not Found\", function () { pm.response.to.have.status(404); });",
+                  "",
+                  "pm.test(\"Answers application/problem+json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});",
+                  "",
+                  "pm.test(\"Says which user\", function () {",
+                  "    pm.expect(pm.response.json().detail).to.include(\"99999\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Idempotency - the first request with a key",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}",
+                "orders"
+              ]
+            },
+            "description": "Send `Idempotency-Key` and the outcome is stored against that key. This is a normal order; the\nnext two requests are what make it interesting.\n\nThe order id is saved into a collection variable so the replay below can compare.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"instrumentId\": 47, \"type\": \"MARKET\", \"side\": \"BUY\", \"size\": 5}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", function () { pm.response.to.have.status(201); });",
+                  "pm.test(\"A real order was placed\", function () {",
+                  "    var o = pm.response.json();",
+                  "    pm.expect(o.status).to.eql(\"FILLED\");",
+                  "    pm.expect(o.size).to.eql(5);",
+                  "    pm.collectionVariables.set(\"keyedOrderId\", o.orderId);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "The same request again, same key - a retry, not a second order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}",
+                "orders"
+              ]
+            },
+            "description": "The same order, re-sent with the key after an imaginary timeout. The body here is deliberately\nreformatted - different whitespace, different field order, `5.00` instead of `5` - because the\nkey is matched against the *parsed* request, not against the raw bytes.\n\nYou get the first order back: same id, same status, same timestamp. Only one order exists, and\nthe cash moved once. Check the portfolio if you want to confirm it.",
+            "body": {
+              "mode": "raw",
+              "raw": "{  \"side\" : \"BUY\", \"type\":\"MARKET\",   \"size\": 5.00, \"instrumentId\" : 47 }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", function () { pm.response.to.have.status(201); });",
+                  "pm.test(\"Replays the first order rather than placing a new one\", function () {",
+                  "    pm.expect(pm.response.json().orderId)",
+                  "      .to.eql(Number(pm.collectionVariables.get(\"keyedOrderId\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "The same key with a different body - a conflict",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}",
+                "orders"
+              ]
+            },
+            "description": "Size 7 this time, under a key that already stands for the size-5 order. That is a client bug,\nand answering either outcome would be wrong, so it is a 409 and nothing is written.\n\nThe earlier order is not disclosed in the error.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"instrumentId\": 47, \"type\": \"MARKET\", \"side\": \"BUY\", \"size\": 7}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 Conflict\", function () { pm.response.to.have.status(409); });",
+                  "",
+                  "pm.test(\"Answers application/problem+json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});",
+                  "",
+                  "pm.test(\"Names the key that was reused\", function () {",
+                  "    pm.expect(pm.response.json().detail).to.include(\"7c9e6679\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "The same key, another user - an independent request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/2/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "2",
+                "orders"
+              ]
+            },
+            "description": "Keys are scoped per user, so user 2 reusing the same string is not a conflict: the request is\nprocessed on its own merits. User 2 has no cash yet, so it is a recorded rejection.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"instrumentId\": 47, \"type\": \"MARKET\", \"side\": \"BUY\", \"size\": 1}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", function () { pm.response.to.have.status(201); });",
+                  "pm.test(\"Judged on its own merits, not replayed\", function () {",
+                  "    var o = pm.response.json();",
+                  "    pm.expect(o.userId).to.eql(2);",
+                  "    pm.expect(o.status).to.eql(\"REJECTED\");",
+                  "    pm.expect(o.rejectionReason).to.eql(\"INSUFFICIENT_FUNDS\");",
+                  "    pm.expect(o.orderId).to.not.eql(Number(pm.collectionVariables.get(\"keyedOrderId\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Cash transfers",
+      "description": "`POST /api/v1/users/{userId}/cash-transfers` - put pesos in, take pesos out.\n\n**These requests write**, they are ordered, and they all act on **user 2**, who starts with an\nempty account in the seeded dataset. Run them top to bottom once.\n\n`side` is `CASH_IN` or `CASH_OUT` and `amount` is a whole number of pesos. The body is closed:\nanything else in it is refused. Like orders, a withdrawal the account cannot cover is a recorded\n`REJECTED` outcome answered `201`, while a request that cannot be acted on writes nothing.",
+      "item": [
+        {
+          "name": "A deposit",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/2/cash-transfers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "2",
+                "cash-transfers"
+              ]
+            },
+            "description": "The happy path. 100,000.00 in, filled immediately.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"side\": \"CASH_IN\", \"amount\": 100000}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", function () { pm.response.to.have.status(201); });",
+                  "pm.test(\"Deposited and filled\", function () {",
+                  "    var t = pm.response.json();",
+                  "    pm.expect(t.side).to.eql(\"CASH_IN\");",
+                  "    pm.expect(t.status).to.eql(\"FILLED\");",
+                  "    pm.expect(t.amount).to.eql(100000.00);",
+                  "    pm.expect(t.rejectionReason).to.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "The cash is there",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/2/portfolio",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "2",
+                "portfolio"
+              ]
+            },
+            "description": "Both figures are now 100,000.00: the deposit is settled, and nothing is holding any of it."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Settled and available cash both 100000.00\", function () {",
+                  "    var p = pm.response.json();",
+                  "    pm.expect(p.settledCash).to.eql(100000.00);",
+                  "    pm.expect(p.availableCash).to.eql(100000.00);",
+                  "    pm.expect(p.totalAccountValue).to.eql(100000.00);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A withdrawal of one peso more than there is",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/2/cash-transfers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "2",
+                "cash-transfers"
+              ]
+            },
+            "description": "The boundary case. One peso over, so it is stored `REJECTED` with a reason and answered `201`;\nthe cash does not move.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"side\": \"CASH_OUT\", \"amount\": 100001}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", function () { pm.response.to.have.status(201); });",
+                  "pm.test(\"Recorded as rejected, with the reason\", function () {",
+                  "    var t = pm.response.json();",
+                  "    pm.expect(t.side).to.eql(\"CASH_OUT\");",
+                  "    pm.expect(t.status).to.eql(\"REJECTED\");",
+                  "    pm.expect(t.rejectionReason).to.eql(\"INSUFFICIENT_FUNDS\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A withdrawal of exactly what there is",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/2/cash-transfers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "2",
+                "cash-transfers"
+              ]
+            },
+            "description": "The other side of the same boundary: emptying the account is allowed.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"side\": \"CASH_OUT\", \"amount\": 100000}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", function () { pm.response.to.have.status(201); });",
+                  "pm.test(\"Filled\", function () {",
+                  "    pm.expect(pm.response.json().status).to.eql(\"FILLED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Back to an empty account",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/2/portfolio",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "2",
+                "portfolio"
+              ]
+            },
+            "description": "Zero again - and zero as a known figure, not as a `null`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Cash is 0.00\", function () {",
+                  "    var p = pm.response.json();",
+                  "    pm.expect(p.settledCash).to.eql(0.00);",
+                  "    pm.expect(p.availableCash).to.eql(0.00);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Idempotency - the first keyed deposit",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "dep-1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/2/cash-transfers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "2",
+                "cash-transfers"
+              ]
+            },
+            "description": "Same mechanism as on orders, and the same key namespace: a key already used for one of this\nuser's orders would conflict here too.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"side\": \"CASH_IN\", \"amount\": 100000}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", function () { pm.response.to.have.status(201); });",
+                  "pm.test(\"Deposited\", function () {",
+                  "    var t = pm.response.json();",
+                  "    pm.expect(t.status).to.eql(\"FILLED\");",
+                  "    pm.collectionVariables.set(\"keyedDepositId\", t.orderId);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "The same deposit again - a retry, not a second deposit",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "dep-1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/2/cash-transfers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "2",
+                "cash-transfers"
+              ]
+            },
+            "description": "`100000.00` is the same amount as `100000`, so this is the same request: you get the first\ntransfer back instead of depositing twice.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"side\": \"CASH_IN\", \"amount\": 100000.0}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", function () { pm.response.to.have.status(201); });",
+                  "pm.test(\"Replays the first deposit\", function () {",
+                  "    pm.expect(pm.response.json().orderId)",
+                  "      .to.eql(Number(pm.collectionVariables.get(\"keyedDepositId\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "And the money arrived once",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/2/portfolio",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "2",
+                "portfolio"
+              ]
+            },
+            "description": "100,000.00, not 200,000.00. This is the assertion that actually proves the retry was safe."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Credited once, not twice\", function () {",
+                  "    pm.expect(pm.response.json().settledCash).to.eql(100000.00);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "The same key for a different transfer - a conflict",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "dep-1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/2/cash-transfers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "2",
+                "cash-transfers"
+              ]
+            },
+            "description": "A withdrawal under the key that stands for a deposit. 409, nothing written.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"side\": \"CASH_OUT\", \"amount\": 100000}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 Conflict\", function () { pm.response.to.have.status(409); });",
+                  "",
+                  "pm.test(\"Answers application/problem+json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "An amount with centavos",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/2/cash-transfers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "2",
+                "cash-transfers"
+              ]
+            },
+            "description": "Transfers are whole pesos. 100.50 is refused rather than rounded - rounding someone's money\nwithout telling them is not an option.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"side\": \"CASH_IN\", \"amount\": 100.5}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", function () { pm.response.to.have.status(400); });",
+                  "",
+                  "pm.test(\"Answers application/problem+json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});",
+                  "",
+                  "pm.test(\"Says it must be whole pesos\", function () {",
+                  "    pm.expect(pm.response.json().detail).to.include(\"whole number of pesos\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "An order's side on this endpoint",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/2/cash-transfers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "2",
+                "cash-transfers"
+              ]
+            },
+            "description": "`BUY` is a perfectly good side - for an order. Here it means nothing, and the error says what\nthe alternatives are.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"side\": \"BUY\", \"amount\": 100}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", function () { pm.response.to.have.status(400); });",
+                  "",
+                  "pm.test(\"Answers application/problem+json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});",
+                  "",
+                  "pm.test(\"Lists the sides that do apply\", function () {",
+                  "    var d = pm.response.json().detail;",
+                  "    pm.expect(d).to.include(\"CASH_IN\");",
+                  "    pm.expect(d).to.include(\"CASH_OUT\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A field that belongs to an order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/2/cash-transfers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "2",
+                "cash-transfers"
+              ]
+            },
+            "description": "A transfer carries only `side` and `amount`. An `instrumentId` here means the caller thinks they\nare placing an order, so it is refused and nothing is written.\n\nNote the asymmetry with order submission, which ignores fields it does not know: the stricter\nrule is on the endpoint that moves money in and out of the system.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"side\": \"CASH_IN\", \"amount\": 100, \"instrumentId\": 66}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", function () { pm.response.to.have.status(400); });",
+                  "",
+                  "pm.test(\"Answers application/problem+json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});",
+                  "",
+                  "pm.test(\"Names the offending field\", function () {",
+                  "    pm.expect(pm.response.json().detail).to.include(\"instrumentId\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Order cancellation",
+      "description": "`POST /api/v1/users/{userId}/orders/{orderId}/cancel` - take a pending order back. No body.\n\n**These requests write**, they are ordered, and they act on the two limit buys that user 1 has\nresting in the seeded dataset: order 5 (LOMA) and order 7.\n\nOnly a `NEW` order can be cancelled. A cancellation releases what the order was holding, so it\nshows up as available cash again on the next portfolio read, while settled cash does not move -\nnothing was ever spent.",
+      "item": [
+        {
+          "name": "What is held before cancelling",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}/portfolio",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}",
+                "portfolio"
+              ]
+            },
+            "description": "A baseline, saved into a collection variable, so the next requests can show the exact effect of\na cancellation without depending on what you ran earlier."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Some cash is held by pending orders\", function () {",
+                  "    var p = pm.response.json();",
+                  "    pm.expect(p.settledCash).to.be.above(p.availableCash);",
+                  "    pm.collectionVariables.set(\"cashBeforeCancel\", p.availableCash);",
+                  "    pm.collectionVariables.set(\"settledBeforeCancel\", p.settledCash);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancel a pending buy",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}/orders/5/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}",
+                "orders",
+                "5",
+                "cancel"
+              ]
+            },
+            "description": "The happy path. Order 5 is a limit buy of 50 LOMA at 710.00, resting `NEW`; it comes back\n`CANCELLED`, with no rejection reason - it was not rejected, it was withdrawn."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Order 5 is cancelled\", function () {",
+                  "    var o = pm.response.json();",
+                  "    pm.expect(o.orderId).to.eql(5);",
+                  "    pm.expect(o.ticker).to.eql(\"LOMA\");",
+                  "    pm.expect(o.type).to.eql(\"LIMIT\");",
+                  "    pm.expect(o.side).to.eql(\"BUY\");",
+                  "    pm.expect(o.size).to.eql(50);",
+                  "    pm.expect(o.price).to.eql(710.00);",
+                  "    pm.expect(o.status).to.eql(\"CANCELLED\");",
+                  "    pm.expect(o.rejectionReason).to.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "The cash it was holding is free again",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}/portfolio",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}",
+                "portfolio"
+              ]
+            },
+            "description": "50 shares at 710.00 is 35,500.00, and that is exactly how much more is available now. Settled\ncash is untouched, because a pending order never spent anything."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "var p = pm.response.json();",
+                  "",
+                  "pm.test(\"Available cash grew by exactly 35500.00\", function () {",
+                  "    var before = Number(pm.collectionVariables.get(\"cashBeforeCancel\"));",
+                  "    pm.expect(p.availableCash).to.eql(Number((before + 35500).toFixed(2)));",
+                  "});",
+                  "",
+                  "pm.test(\"Settled cash did not move\", function () {",
+                  "    pm.expect(p.settledCash).to.eql(Number(pm.collectionVariables.get(\"settledBeforeCancel\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancelling it again",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}/orders/5/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}",
+                "orders",
+                "5",
+                "cancel"
+              ]
+            },
+            "description": "Order 5 is no longer `NEW`, so there is nothing to cancel. 409, and the message says what state\nit is actually in.\n\nNote this is *not* what a retry looks like - see the keyed requests below."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 Conflict\", function () { pm.response.to.have.status(409); });",
+                  "",
+                  "pm.test(\"Answers application/problem+json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});",
+                  "",
+                  "pm.test(\"Says the order is already cancelled\", function () {",
+                  "    pm.expect(pm.response.json().detail).to.include(\"CANCELLED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancelling an order that already filled",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}/orders/2/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}",
+                "orders",
+                "2",
+                "cancel"
+              ]
+            },
+            "description": "Order 2 executed. The trade happened; it cannot be called back."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 Conflict\", function () { pm.response.to.have.status(409); });",
+                  "",
+                  "pm.test(\"Answers application/problem+json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});",
+                  "",
+                  "pm.test(\"Says the order is filled\", function () {",
+                  "    pm.expect(pm.response.json().detail).to.include(\"FILLED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancelling someone else's order",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/2/orders/7/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "2",
+                "orders",
+                "7",
+                "cancel"
+              ]
+            },
+            "description": "Order 7 exists, but it belongs to user 1, and this request is addressed to user 2's orders.\n\nThe answer is a 404 with the *same* message as an order that was never created - a caller cannot\nuse this endpoint to find out which order ids belong to somebody else. Order 7 stays `NEW`, as\nthe next request shows."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 Not Found\", function () { pm.response.to.have.status(404); });",
+                  "",
+                  "pm.test(\"Answers application/problem+json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});",
+                  "",
+                  "pm.test(\"Indistinguishable from a missing order\", function () {",
+                  "    pm.expect(pm.response.json().detail).to.eql(\"Order 7 does not exist for user 2\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancelling an order that does not exist",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/2/orders/999/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "2",
+                "orders",
+                "999",
+                "cancel"
+              ]
+            },
+            "description": "Same shape of answer as the request above. That is the point."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 Not Found\", function () { pm.response.to.have.status(404); });",
+                  "",
+                  "pm.test(\"Answers application/problem+json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});",
+                  "",
+                  "pm.test(\"Same wording, different id\", function () {",
+                  "    pm.expect(pm.response.json().detail).to.eql(\"Order 999 does not exist for user 2\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Idempotency - a keyed cancellation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "cancel-7"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}/orders/7/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}",
+                "orders",
+                "7",
+                "cancel"
+              ]
+            },
+            "description": "Order 7 is user 1's other pending buy, cancelled under a key this time."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Order 7 is cancelled\", function () {",
+                  "    var o = pm.response.json();",
+                  "    pm.expect(o.orderId).to.eql(7);",
+                  "    pm.expect(o.status).to.eql(\"CANCELLED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "The same cancellation again - a retry, not a 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "cancel-7"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}/orders/7/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}",
+                "orders",
+                "7",
+                "cancel"
+              ]
+            },
+            "description": "Compare with \"cancelling it again\" above, which got a 409. The difference is the key: with it,\nthis is recognisably the same request as the one that already succeeded, so it replays that\nanswer instead of complaining about the order's state. One cancellation happened, not two."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Replays the same cancelled order\", function () {",
+                  "    var o = pm.response.json();",
+                  "    pm.expect(o.orderId).to.eql(7);",
+                  "    pm.expect(o.status).to.eql(\"CANCELLED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "The same key for a different order - a conflict",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "cancel-7"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}/orders/5/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}",
+                "orders",
+                "5",
+                "cancel"
+              ]
+            },
+            "description": "The key stands for cancelling order 7; this asks it to cancel order 5. 409, and the message\nnames the key rather than the order's state - the request never got far enough to look at it."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 Conflict\", function () { pm.response.to.have.status(409); });",
+                  "",
+                  "pm.test(\"Answers application/problem+json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});",
+                  "",
+                  "pm.test(\"Names the key that was reused\", function () {",
+                  "    pm.expect(pm.response.json().detail).to.include(\"cancel-7\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string",
+      "description": "Where the API is listening."
+    },
+    {
+      "key": "userId",
+      "value": "1",
+      "type": "string",
+      "description": "The seeded user with a portfolio and two pending orders."
+    },
+    {
+      "key": "portfolioSnapshot",
+      "value": "",
+      "type": "string",
+      "description": "Filled in at run time, to compare two consecutive portfolio reads."
+    },
+    {
+      "key": "keyedOrderId",
+      "value": "",
+      "type": "string",
+      "description": "Filled in at run time by the idempotent order requests."
+    },
+    {
+      "key": "keyedDepositId",
+      "value": "",
+      "type": "string",
+      "description": "Filled in at run time by the idempotent deposit requests."
+    },
+    {
+      "key": "cashBeforeCancel",
+      "value": "",
+      "type": "string",
+      "description": "Filled in at run time, to measure what a cancellation releases."
+    },
+    {
+      "key": "settledBeforeCancel",
+      "value": "",
+      "type": "string",
+      "description": "Filled in at run time, to check settled cash does not move."
+    }
+  ]
+}

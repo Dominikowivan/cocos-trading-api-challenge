@@ -14,8 +14,9 @@ behind the solution, not only the solution. So here is the map.
 | [`docs/challenge/`](docs/challenge) | The statement this solution answers, kept verbatim so requirements can be cited instead of paraphrased |
 | [`docs/journal/`](docs/journal) | **The intent journal. Start here.** Every decision, in the order it was taken, with what was known at the time |
 | [`docs/adr/`](docs/adr) | Architecture Decision Records: one file per decision, with the alternatives that were discarded |
-| [`docs/api/openapi.yaml`](docs/api/openapi.yaml) | The API contract as it is today. Every response in the web tests is validated against it (ADR-0024), and it can be imported to Postman as a collection |
-| [`docs/api/trading-api.http`](docs/api/trading-api.http) | Example requests with their expected figures, runnable from IntelliJ's HTTP Client or VS Code's REST Client |
+| [`docs/api/openapi.yaml`](docs/api/openapi.yaml) | The API contract as it is today. Every response in the web tests is validated against it (ADR-0024) |
+| [`docs/api/cocos-trading-api.postman_collection.json`](docs/api/cocos-trading-api.postman_collection.json) | **A Postman collection that walks the whole API.** The fastest way to try it: 66 requests, happy paths first and then the edge cases, each one explaining what it shows and asserting the figures it expects |
+| [`docs/api/trading-api.http`](docs/api/trading-api.http) | The same example requests with their expected figures, runnable from IntelliJ's HTTP Client or VS Code's REST Client |
 | [`specs/`](specs) | One folder per feature, written with Spec Kit before the code. Its `contracts/` keeps the API as that feature designed it, and is not edited afterwards |
 | `src/main/java` | Application code |
 | `src/test/java` | Tests |
@@ -60,9 +61,26 @@ database) holding the provided dataset:
 docker compose --profile app up --build
 ```
 
+### Trying it
+
+Import [`docs/api/cocos-trading-api.postman_collection.json`](docs/api/cocos-trading-api.postman_collection.json)
+into Postman and run the folders in order. Each request carries a note on what it is showing and a
+few tests, so the Collection Runner gives a pass/fail sweep of the whole API in one go: the happy
+path of every endpoint, then the edge cases worth seeing — a rejection that is *recorded* rather
+than refused, `null` where a figure is unknown against `0` where it is genuinely zero, and a retry
+under an `Idempotency-Key` that does not trade twice.
+
+The first three folders only read and can be re-run freely. The last three write, in order, and
+their figures assume the dataset as seeded; to get back to it, `docker compose down -v` and bring
+the stack up again. The same requests are also in
+[`docs/api/trading-api.http`](docs/api/trading-api.http), for IntelliJ's HTTP Client or VS Code's
+REST Client.
+
+### The two environments
+
 There are two environments, because the provided database and a development database are not the
-same thing. The one above is local. The provided one is **staging**: it is what the exercise is
-evaluated against, and nothing experimental runs on it.
+same thing. The `docker compose` command above starts the local one. The provided one is
+**staging**: it is what the exercise is evaluated against, and nothing experimental runs on it.
 
 **The provided dataset is loaded only under the `local` profile** (ADR-0029). The default profile
 applies the schema migrations and nothing else, so an environment has to ask for the fixture data
