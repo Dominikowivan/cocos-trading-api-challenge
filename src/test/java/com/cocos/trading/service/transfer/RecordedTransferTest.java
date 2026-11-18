@@ -14,7 +14,7 @@ import com.cocos.trading.model.instrument.InstrumentRef;
 import com.cocos.trading.model.order.CashMovement;
 import com.cocos.trading.model.order.LedgerSide;
 import com.cocos.trading.model.order.NewOrder;
-import com.cocos.trading.model.order.OrderKind;
+import com.cocos.trading.model.order.OrderType;
 import com.cocos.trading.model.order.OrderSide;
 import com.cocos.trading.model.order.OrderStatus;
 import com.cocos.trading.model.user.UserId;
@@ -41,7 +41,7 @@ class RecordedTransferTest {
 	}
 
 	private static NewOrder orderOf(InstrumentRef instrument, LedgerSide side) {
-		return new NewOrder(new UserId(1), instrument, side, OrderKind.MARKET, OrderStatus.FILLED,
+		return new NewOrder(new UserId(1), instrument, side, OrderType.MARKET, OrderStatus.FILLED,
 				BigDecimal.valueOf(100), Price.of(BigDecimal.ONE), Optional.empty(),
 				LocalDateTime.parse("2026-11-17T15:04:05"));
 	}

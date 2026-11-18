@@ -53,3 +53,7 @@ currently holds; the journal is the authority on how it was reached.**
 | [0041](0041-the-order-cancellation-endpoint-shape.md) | Cancellation is `POST …/users/{userId}/orders/{orderId}/cancel`, answering the order | Accepted |
 | [0042](0042-the-history-reason-says-why-the-order-moved.md) | The history's `reason` says why the order moved, not only why it was rejected | Accepted |
 | [0043](0043-a-replay-answers-the-outcome-as-first-recorded.md) | An idempotent replay answers the outcome as first recorded | Accepted |
+| [0044](0044-the-latest-price-is-one-index-seek-per-instrument.md) | The latest price is one index seek per instrument, not a scan of every price | Accepted |
+| [0045](0045-a-transitions-reason-is-a-sealed-type-not-two-optionals.md) | A transition's reason is a sealed type, not two `Optional`s | Accepted |
+| [0046](0046-waiting-for-a-lock-has-its-own-deadline.md) | Waiting for a lock has its own deadline, narrower than the transaction | Accepted |
+| [0047](0047-one-claim-per-order.md) | One claim per order, stated as a constraint | Accepted |

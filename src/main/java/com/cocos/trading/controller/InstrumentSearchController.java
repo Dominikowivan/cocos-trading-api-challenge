@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.cocos.trading.controller.dto.InstrumentSearchResponse;
+import com.cocos.trading.controller.dto.response.InstrumentSearchResponse;
 import com.cocos.trading.service.search.InstrumentSearchService;
 import com.cocos.trading.service.search.SearchRequest;
 

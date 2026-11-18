@@ -9,7 +9,7 @@ import com.cocos.trading.model.instrument.InstrumentRef;
 import com.cocos.trading.model.order.CashMovement;
 import com.cocos.trading.model.order.LedgerSide;
 import com.cocos.trading.model.order.Order;
-import com.cocos.trading.model.order.OrderKind;
+import com.cocos.trading.model.order.OrderType;
 import com.cocos.trading.model.order.OrderSide;
 import com.cocos.trading.model.order.OrderStatus;
 
@@ -49,44 +49,44 @@ public final class Ledgers {
 	}
 
 	public static Order filledBuy(InstrumentRef instrument, long size, String price, String at) {
-		return order(instrument, OrderSide.BUY, OrderStatus.FILLED, OrderKind.MARKET, size, price, at);
+		return order(instrument, OrderSide.BUY, OrderStatus.FILLED, OrderType.MARKET, size, price, at);
 	}
 
 	public static Order filledSell(InstrumentRef instrument, long size, String price, String at) {
-		return order(instrument, OrderSide.SELL, OrderStatus.FILLED, OrderKind.MARKET, size, price, at);
+		return order(instrument, OrderSide.SELL, OrderStatus.FILLED, OrderType.MARKET, size, price, at);
 	}
 
 	public static Order cashIn(long amount, String at) {
-		return order(ARS, CashMovement.CASH_IN, OrderStatus.FILLED, OrderKind.MARKET, amount, "1", at);
+		return order(ARS, CashMovement.CASH_IN, OrderStatus.FILLED, OrderType.MARKET, amount, "1", at);
 	}
 
 	public static Order cashOut(long amount, String at) {
-		return order(ARS, CashMovement.CASH_OUT, OrderStatus.FILLED, OrderKind.MARKET, amount, "1", at);
+		return order(ARS, CashMovement.CASH_OUT, OrderStatus.FILLED, OrderType.MARKET, amount, "1", at);
 	}
 
 	public static Order openBuyLimit(InstrumentRef instrument, long size, String price, String at) {
-		return order(instrument, OrderSide.BUY, OrderStatus.NEW, OrderKind.LIMIT, size, price, at);
+		return order(instrument, OrderSide.BUY, OrderStatus.NEW, OrderType.LIMIT, size, price, at);
 	}
 
 	public static Order openSellLimit(InstrumentRef instrument, long size, String price, String at) {
-		return order(instrument, OrderSide.SELL, OrderStatus.NEW, OrderKind.LIMIT, size, price, at);
+		return order(instrument, OrderSide.SELL, OrderStatus.NEW, OrderType.LIMIT, size, price, at);
 	}
 
 	public static Order openBuyMarket(InstrumentRef instrument, long size, String price, String at) {
-		return order(instrument, OrderSide.BUY, OrderStatus.NEW, OrderKind.MARKET, size, price, at);
+		return order(instrument, OrderSide.BUY, OrderStatus.NEW, OrderType.MARKET, size, price, at);
 	}
 
 	public static Order cancelledBuyLimit(InstrumentRef instrument, long size, String price, String at) {
-		return order(instrument, OrderSide.BUY, OrderStatus.CANCELLED, OrderKind.LIMIT, size, price, at);
+		return order(instrument, OrderSide.BUY, OrderStatus.CANCELLED, OrderType.LIMIT, size, price, at);
 	}
 
 	public static Order rejectedSell(InstrumentRef instrument, long size, String price, String at) {
-		return order(instrument, OrderSide.SELL, OrderStatus.REJECTED, OrderKind.MARKET, size, price, at);
+		return order(instrument, OrderSide.SELL, OrderStatus.REJECTED, OrderType.MARKET, size, price, at);
 	}
 
-	public static Order order(InstrumentRef instrument, LedgerSide side, OrderStatus status, OrderKind kind, long size,
+	public static Order order(InstrumentRef instrument, LedgerSide side, OrderStatus status, OrderType type, long size,
 			String price, String at) {
-		return new Order(IDS.incrementAndGet(), instrument, side, status, kind, BigDecimal.valueOf(size),
+		return new Order(IDS.incrementAndGet(), instrument, side, status, type, BigDecimal.valueOf(size),
 				new BigDecimal(price), LocalDateTime.parse(at));
 	}
 

@@ -8,7 +8,7 @@ import com.cocos.trading.model.DecimalPolicy;
 import com.cocos.trading.model.Price;
 import com.cocos.trading.model.instrument.Closes;
 import com.cocos.trading.model.instrument.InstrumentRef;
-import com.cocos.trading.model.order.OrderKind;
+import com.cocos.trading.model.order.OrderType;
 import com.cocos.trading.model.order.OrderSide;
 
 public final class Submission {
@@ -17,25 +17,25 @@ public final class Submission {
 
 	private final OrderSide side;
 
-	private final OrderKind kind;
+	private final OrderType type;
 
 	private final TradeQuantity quantity;
 
 	private final Price limitPrice;
 
-	private Submission(InstrumentRef instrument, OrderSide side, OrderKind kind, TradeQuantity quantity,
+	private Submission(InstrumentRef instrument, OrderSide side, OrderType type, TradeQuantity quantity,
 			Price limitPrice) {
 		this.instrument = instrument;
 		this.side = side;
-		this.kind = kind;
+		this.type = type;
 		this.quantity = quantity;
 		this.limitPrice = limitPrice;
 	}
 
-	public static Submission of(InstrumentRef instrument, OrderSide side, OrderKind kind, TradeQuantity quantity,
+	public static Submission of(InstrumentRef instrument, OrderSide side, OrderType type, TradeQuantity quantity,
 			BigDecimal limitPrice) {
 		requireATradableInstrument(instrument);
-		return new Submission(instrument, side, kind, quantity, priceExactlyWhenItIsALimitOrder(kind, limitPrice));
+		return new Submission(instrument, side, type, quantity, priceExactlyWhenItIsALimitOrder(type, limitPrice));
 	}
 
 	public InstrumentRef instrument() {
@@ -46,8 +46,8 @@ public final class Submission {
 		return side;
 	}
 
-	public OrderKind kind() {
-		return kind;
+	public OrderType type() {
+		return type;
 	}
 
 	public Optional<PricedSubmission> priceGovernedBy(Supplier<Closes> market) {
@@ -59,7 +59,7 @@ public final class Submission {
 	}
 
 	private Optional<Price> governingPrice(Supplier<Closes> market) {
-		if (kind == OrderKind.LIMIT) {
+		if (type == OrderType.LIMIT) {
 			return Optional.of(limitPrice);
 		}
 		return market.get().of(instrument);
@@ -72,8 +72,8 @@ public final class Submission {
 		}
 	}
 
-	private static Price priceExactlyWhenItIsALimitOrder(OrderKind kind, BigDecimal price) {
-		if (kind == OrderKind.MARKET) {
+	private static Price priceExactlyWhenItIsALimitOrder(OrderType type, BigDecimal price) {
+		if (type == OrderType.MARKET) {
 			requireNoPrice(price);
 			return null;
 		}

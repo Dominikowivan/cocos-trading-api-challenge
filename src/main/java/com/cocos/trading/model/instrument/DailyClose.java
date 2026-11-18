@@ -29,7 +29,9 @@ public final class DailyClose {
 	}
 
 	public Optional<BigDecimal> dailyReturnPercent() {
-		if (this.close == null || isUnusableDivisor()) {
+		boolean hasNoPairOfClosesToCompare = this.close == null || isUnusableDivisor();
+
+		if (hasNoPairOfClosesToCompare) {
 			return Optional.empty();
 		}
 		return Optional.of(DecimalPolicy.percent(this.close.subtract(this.previousClose), this.previousClose));

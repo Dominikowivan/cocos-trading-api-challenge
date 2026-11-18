@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import com.cocos.trading.model.order.OrderKind;
+import com.cocos.trading.model.order.OrderType;
 import com.cocos.trading.model.order.OrderSide;
 
 class SubmissionPricePresenceTest {
@@ -45,18 +45,18 @@ class SubmissionPricePresenceTest {
 	void a_market_order_carrying_a_price_is_still_refused_rather_than_having_it_ignored() {
 		assertThatIllegalArgumentException()
 			.isThrownBy(
-					() -> Submission.of(PAMP, OrderSide.BUY, OrderKind.MARKET, sizeOf(10), new BigDecimal("900.00")))
+					() -> Submission.of(PAMP, OrderSide.BUY, OrderType.MARKET, sizeOf(10), new BigDecimal("900.00")))
 			.withMessageContaining("takes no price");
 	}
 
 	@Test
 	void a_market_order_without_a_price_is_the_normal_case() {
 		assertThatNoException()
-			.isThrownBy(() -> Submission.of(PAMP, OrderSide.BUY, OrderKind.MARKET, sizeOf(10), null));
+			.isThrownBy(() -> Submission.of(PAMP, OrderSide.BUY, OrderType.MARKET, sizeOf(10), null));
 	}
 
 	private static Submission limitOrderPricedAt(BigDecimal price) {
-		return Submission.of(PAMP, OrderSide.BUY, OrderKind.LIMIT, sizeOf(10), price);
+		return Submission.of(PAMP, OrderSide.BUY, OrderType.LIMIT, sizeOf(10), price);
 	}
 
 }

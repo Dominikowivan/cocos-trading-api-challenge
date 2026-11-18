@@ -1,22 +1,20 @@
 package com.cocos.trading.service.cancellation;
 
-import java.time.Clock;
-import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.cocos.trading.model.order.CancellationDecision;
-import com.cocos.trading.model.order.CancellationRule;
+import com.cocos.trading.model.order.cancellation.CancellationDecision;
+import com.cocos.trading.model.order.cancellation.CancellationRule;
 import com.cocos.trading.model.order.NewOrder;
 import com.cocos.trading.model.order.RecordedTransition;
 import com.cocos.trading.persistence.OrderRepository;
 import com.cocos.trading.persistence.OrderStatusHistoryRepository;
 import com.cocos.trading.persistence.mapper.OrderMapper;
 import com.cocos.trading.service.userwrite.KeyedRequest;
+import com.cocos.trading.service.userwrite.LedgerClock;
 import com.cocos.trading.service.userwrite.UserWrite;
 
 @Service
@@ -29,10 +27,10 @@ public class OrderCancellationService {
 
 	private final OrderStatusHistoryRepository orderStatusHistoryRepository;
 
-	private final Clock clock;
+	private final LedgerClock clock;
 
 	public OrderCancellationService(UserWrite userWrite, OrderRepository orderRepository,
-			OrderStatusHistoryRepository orderStatusHistoryRepository, Clock clock) {
+			OrderStatusHistoryRepository orderStatusHistoryRepository, LedgerClock clock) {
 		this.userWrite = userWrite;
 		this.orderRepository = orderRepository;
 		this.orderStatusHistoryRepository = orderStatusHistoryRepository;
@@ -67,7 +65,7 @@ public class OrderCancellationService {
 	}
 
 	private CancellationDecision.Cancellation cancellationOf(RequestedCancellation requested, NewOrder order) {
-		return switch (CancellationRule.decide(requested.orderId(), order.status(), now())) {
+		return switch (CancellationRule.decide(requested.orderId(), order.status(), clock.now())) {
 			case CancellationDecision.Cancellation cancellation -> cancellation;
 			case CancellationDecision.NotCancellable refusal -> throw OrderNotCancellableException.of(refusal);
 		};
@@ -79,10 +77,6 @@ public class OrderCancellationService {
 			throw OrderNotCancellableException.leftNewBeforeItsTransition(orderIdColumn);
 		}
 		orderStatusHistoryRepository.appendCancellationOf(orderIdColumn, cancellation);
-	}
-
-	private LocalDateTime now() {
-		return LocalDateTime.now(clock).truncatedTo(ChronoUnit.MICROS);
 	}
 
 	private CancelledOrder recordedCancellation(Integer orderId) {

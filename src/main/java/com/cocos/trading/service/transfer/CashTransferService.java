@@ -1,8 +1,5 @@
 package com.cocos.trading.service.transfer;
 
-import java.time.Clock;
-import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 
@@ -14,14 +11,13 @@ import com.cocos.trading.model.instrument.InstrumentRef;
 import com.cocos.trading.model.ledger.AccountLedger;
 import com.cocos.trading.model.ledger.AccountSnapshot;
 import com.cocos.trading.model.order.NewOrder;
-import com.cocos.trading.model.order.OrderStatus;
 import com.cocos.trading.model.order.RecordedTransition;
 import com.cocos.trading.persistence.InstrumentRepository;
 import com.cocos.trading.persistence.OrderRepository;
 import com.cocos.trading.persistence.OrderStatusHistoryRepository;
 import com.cocos.trading.persistence.mapper.InstrumentMapper;
-import com.cocos.trading.persistence.mapper.OrderMapper;
 import com.cocos.trading.service.userwrite.KeyedRequest;
+import com.cocos.trading.service.userwrite.LedgerClock;
 import com.cocos.trading.service.userwrite.UserWrite;
 
 @Service
@@ -36,10 +32,11 @@ public class CashTransferService {
 
 	private final OrderStatusHistoryRepository orderStatusHistoryRepository;
 
-	private final Clock clock;
+	private final LedgerClock clock;
 
 	public CashTransferService(UserWrite userWrite, InstrumentRepository instrumentRepository,
-			OrderRepository orderRepository, OrderStatusHistoryRepository orderStatusHistoryRepository, Clock clock) {
+			OrderRepository orderRepository, OrderStatusHistoryRepository orderStatusHistoryRepository,
+			LedgerClock clock) {
 		this.userWrite = userWrite;
 		this.instrumentRepository = instrumentRepository;
 		this.orderRepository = orderRepository;
@@ -59,7 +56,7 @@ public class CashTransferService {
 		InstrumentRef cash = cashInstrument();
 		AccountSnapshot snapshot = availabilityOf(userIdColumn);
 
-		return appended(requested.recordedFor(snapshot, cash, now()));
+		return appended(requested.recordedFor(snapshot, cash, clock.now()));
 	}
 
 	private InstrumentRef cashInstrument() {
@@ -75,13 +72,7 @@ public class CashTransferService {
 	}
 
 	private AccountSnapshot availabilityOf(Integer userIdColumn) {
-		return new AccountLedger(OrderMapper.toOrders(
-				orderRepository.findOrdersOf(userIdColumn, OrderMapper.toStatusColumns(OrderStatus.contributing()))))
-			.snapshot();
-	}
-
-	private LocalDateTime now() {
-		return LocalDateTime.now(clock).truncatedTo(ChronoUnit.MICROS);
+		return new AccountLedger(orderRepository.contributingOrdersOf(userIdColumn)).snapshot();
 	}
 
 	private RecordedTransfer appended(NewOrder order) {

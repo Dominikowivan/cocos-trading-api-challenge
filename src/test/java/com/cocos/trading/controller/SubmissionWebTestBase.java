@@ -1,5 +1,6 @@
 package com.cocos.trading.controller;
 
+import static com.cocos.trading.controller.ApiPaths.ORDERS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -8,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.concurrent.Callable;
 
 import javax.sql.DataSource;
 
@@ -19,9 +21,7 @@ import org.springframework.test.web.servlet.ResultActions;
 
 import com.jayway.jsonpath.JsonPath;
 
-abstract class SubmissionWebTestBase extends WebTestBase {
-
-	protected static final String ORDERS = "/api/v1/users/{userId}/orders";
+public abstract class SubmissionWebTestBase extends WebTestBase {
 
 	protected static final String IDEMPOTENCY_KEY = "Idempotency-Key";
 
@@ -65,18 +65,17 @@ abstract class SubmissionWebTestBase extends WebTestBase {
 	}
 
 	protected ResultActions refused(long userId, String body) throws Exception {
-		long before = ordersInTheLedger();
-
-		ResultActions response = submit(userId, body);
-
-		assertThat(ordersInTheLedger()).isEqualTo(before);
-		return response;
+		return leavingTheLedgerUntouched(() -> submit(userId, body));
 	}
 
 	protected ResultActions refused(long userId, String body, String idempotencyKey) throws Exception {
+		return leavingTheLedgerUntouched(() -> submit(userId, body, idempotencyKey));
+	}
+
+	protected ResultActions leavingTheLedgerUntouched(Callable<ResultActions> attempt) throws Exception {
 		long before = ordersInTheLedger();
 
-		ResultActions response = submit(userId, body, idempotencyKey);
+		ResultActions response = attempt.call();
 
 		assertThat(ordersInTheLedger()).isEqualTo(before);
 		return response;
@@ -105,6 +104,10 @@ abstract class SubmissionWebTestBase extends WebTestBase {
 
 	protected long claimedKeys() {
 		return jdbcTemplate.queryForObject("SELECT count(*) FROM order_idempotency", Long.class);
+	}
+
+	protected JdbcTemplate jdbc() {
+		return jdbcTemplate;
 	}
 
 	protected void fund(long userId, long pesos) {

@@ -1,28 +1,22 @@
 package com.cocos.trading.controller;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static com.cocos.trading.controller.ApiPaths.CASH_TRANSFERS;
+import static com.cocos.trading.controller.ApiPaths.PORTFOLIO;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import java.math.BigDecimal;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.ResultActions;
 
-abstract class CashTransferWebTestBase extends SubmissionWebTestBase {
-
-	protected static final String CASH_TRANSFERS = "/api/v1/users/{userId}/cash-transfers";
+public abstract class CashTransferWebTestBase extends SubmissionWebTestBase {
 
 	protected static final long USER_THREE = 3;
 
 	protected static final long USER_FOUR = 4;
 
 	protected static final long UNKNOWN_USER = 999;
-
-	@Autowired
-	private JdbcTemplate jdbc;
 
 	protected ResultActions transfer(long userId, String body) throws Exception {
 		return mvc.perform(post(CASH_TRANSFERS, userId).contentType(MediaType.APPLICATION_JSON).content(body));
@@ -35,21 +29,11 @@ abstract class CashTransferWebTestBase extends SubmissionWebTestBase {
 	}
 
 	protected ResultActions refusedTransfer(long userId, String body) throws Exception {
-		long before = ordersInTheLedger();
-
-		ResultActions response = transfer(userId, body);
-
-		assertThat(ordersInTheLedger()).isEqualTo(before);
-		return response;
+		return leavingTheLedgerUntouched(() -> transfer(userId, body));
 	}
 
 	protected ResultActions refusedTransfer(long userId, String body, String idempotencyKey) throws Exception {
-		long before = ordersInTheLedger();
-
-		ResultActions response = transfer(userId, body, idempotencyKey);
-
-		assertThat(ordersInTheLedger()).isEqualTo(before);
-		return response;
+		return leavingTheLedgerUntouched(() -> transfer(userId, body, idempotencyKey));
 	}
 
 	protected String deposited(long userId, long pesos) throws Exception {
@@ -69,11 +53,7 @@ abstract class CashTransferWebTestBase extends SubmissionWebTestBase {
 	}
 
 	protected long ordersOf(long userId) {
-		return jdbc.queryForObject("SELECT count(*) FROM orders WHERE userid = ?", Long.class, userId);
-	}
-
-	protected JdbcTemplate jdbc() {
-		return jdbc;
+		return jdbc().queryForObject("SELECT count(*) FROM orders WHERE userid = ?", Long.class, userId);
 	}
 
 	protected static String depositOf(long pesos) {

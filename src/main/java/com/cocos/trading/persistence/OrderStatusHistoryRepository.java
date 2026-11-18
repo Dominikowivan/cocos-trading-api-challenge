@@ -5,7 +5,7 @@ import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import com.cocos.trading.model.order.CancellationDecision;
+import com.cocos.trading.model.order.cancellation.CancellationDecision;
 import com.cocos.trading.model.order.NewOrder;
 import com.cocos.trading.model.order.OrderStatus;
 import com.cocos.trading.model.order.RecordedTransition;

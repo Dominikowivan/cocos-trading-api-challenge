@@ -1,5 +1,6 @@
 package com.cocos.trading.controller;
 
+import static com.cocos.trading.controller.ApiPaths.INSTRUMENT_SEARCH;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -15,11 +16,7 @@ import com.cocos.trading.TestcontainersConfiguration;
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import({ TestcontainersConfiguration.class, ContractValidationConfiguration.class })
-abstract class WebTestBase {
-
-	protected static final String PORTFOLIO = "/api/v1/users/{userId}/portfolio";
-
-	protected static final String INSTRUMENT_SEARCH = "/api/v1/instruments/search";
+public abstract class WebTestBase {
 
 	@Autowired
 	protected MockMvc mvc;

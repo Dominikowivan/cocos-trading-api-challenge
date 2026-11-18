@@ -10,7 +10,7 @@ import com.cocos.trading.model.instrument.InstrumentRef;
 import com.cocos.trading.model.ledger.AccountSnapshot;
 import com.cocos.trading.model.order.CashMovement;
 import com.cocos.trading.model.order.NewOrder;
-import com.cocos.trading.model.order.OrderKind;
+import com.cocos.trading.model.order.OrderType;
 import com.cocos.trading.model.order.OrderStatus;
 import com.cocos.trading.model.order.RejectionReason;
 import com.cocos.trading.model.user.UserId;
@@ -23,7 +23,7 @@ public final class CashTransfer {
 
 	private static final Price ONE_PESO = Price.of(BigDecimal.ONE);
 
-	private static final OrderKind SETTLES_AT_ONCE = OrderKind.MARKET;
+	private static final OrderType SETTLES_AT_ONCE = OrderType.MARKET;
 
 	private final CashMovement direction;
 
@@ -53,7 +53,10 @@ public final class CashTransfer {
 	}
 
 	private Optional<RejectionReason> shortfallIn(AccountSnapshot snapshot) {
-		if (direction == CashMovement.CASH_OUT && snapshot.availableCash().compareTo(amount) < 0) {
+		boolean withdrawalBeyondTheAvailableCash = direction == CashMovement.CASH_OUT
+				&& snapshot.availableCash().compareTo(amount) < 0;
+
+		if (withdrawalBeyondTheAvailableCash) {
 			return Optional.of(RejectionReason.INSUFFICIENT_FUNDS);
 		}
 		return Optional.empty();

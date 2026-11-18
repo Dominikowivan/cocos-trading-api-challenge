@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -95,7 +96,7 @@ class ApiExceptionHandler {
 	}
 
 	@ExceptionHandler({ QueryTimeoutException.class, TransactionTimedOutException.class,
-			CannotCreateTransactionException.class })
+			CannotCreateTransactionException.class, PessimisticLockingFailureException.class })
 	ProblemDetail databaseUnavailable(Exception exception) {
 		log.warn("database did not answer in time: {}", exception.getMessage());
 		return problem(HttpStatus.SERVICE_UNAVAILABLE, "The service is temporarily unavailable, try again later");

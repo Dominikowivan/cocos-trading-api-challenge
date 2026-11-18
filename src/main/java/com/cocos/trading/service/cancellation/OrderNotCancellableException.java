@@ -1,6 +1,6 @@
 package com.cocos.trading.service.cancellation;
 
-import com.cocos.trading.model.order.CancellationDecision;
+import com.cocos.trading.model.order.cancellation.CancellationDecision;
 
 public class OrderNotCancellableException extends RuntimeException {
 

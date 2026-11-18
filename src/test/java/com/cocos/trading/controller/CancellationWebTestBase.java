@@ -1,5 +1,6 @@
 package com.cocos.trading.controller;
 
+import static com.cocos.trading.controller.ApiPaths.CANCEL;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -8,9 +9,7 @@ import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.springframework.test.web.servlet.ResultActions;
 
-abstract class CancellationWebTestBase extends CashTransferWebTestBase {
-
-	protected static final String CANCEL = "/api/v1/users/{userId}/orders/{orderId}/cancel";
+public abstract class CancellationWebTestBase extends CashTransferWebTestBase {
 
 	protected static final long PENDING_BUY = 5;
 
@@ -59,7 +58,7 @@ abstract class CancellationWebTestBase extends CashTransferWebTestBase {
 		return jdbc().queryForObject("SELECT count(*) FROM order_status_history", Long.class);
 	}
 
-	protected record Transition(String status, String reason) {
+	public record Transition(String status, String reason) {
 
 	}
 

@@ -58,8 +58,4 @@ public final class DecimalPolicy {
 		return part.multiply(PERCENT).divide(whole, RETURN_SCALE, ROUNDING);
 	}
 
-	public static BigDecimal zeroMoney() {
-		return money(BigDecimal.ZERO);
-	}
-
 }

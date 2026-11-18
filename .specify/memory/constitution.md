@@ -1,5 +1,24 @@
 <!--
 Sync Impact Report
+- Version change: 2.4.0 → 2.4.1 (PATCH: clarification; the rule itself is unchanged)
+- Modified principles:
+  - VIII. Layers — the by-role grouping of `controller` now names the two roles inside `dto`:
+    requests and responses live in `dto/request` and `dto/response`. The principle is unchanged —
+    `controller` still groups by role — so this says which roles, and why `dto` is not grouped by
+    use case
+- Modified sections: none
+- Added sections: none
+- Removed sections: none
+- Templates: not modified (they read this file at runtime)
+- Origin: the author's refactor pass after order cancellation shipped
+  (`docs/journal/10Refactors.md`, item 2). Grouping `dto` by use case was considered and
+  discarded: `OrderResponse` is deliberately shared by order submission and order cancellation,
+  so a by-use-case grouping would have put it in a shared root — the catch-all this principle
+  forbids. The distinction that holds is the direction: a request carries validation and
+  Jackson's strictness about unknown fields, a response carries neither
+- Deferred TODOs: none
+
+Previous report (2.4.0, 2026-11-17)
 - Version change: 2.3.1 → 2.4.0 (MINOR: materially expanded guidance)
 - Modified principles:
   - VIII. Layers — `service` may hold, besides one subpackage per use case, one subpackage of
@@ -300,8 +319,13 @@ decisions, so an ADR missing from it is an ADR nobody will read.
   raw request model and gets a response model back: validating the request against configured
   limits is the use case's job, so the controller never reads configuration. `model` groups by
   concept (`model/portfolio`), keeping at its root only what every concept shares
-  (`DecimalPolicy`). `controller` and `persistence` group by role (`dto`, `entity`, `mapper`). A
-  subpackage that starts holding a second concept is split in the same change that adds it.
+  (`DecimalPolicy`). `controller` and `persistence` group by role (`dto`, `entity`, `mapper`),
+  and `dto` splits by direction (`dto/request`, `dto/response`) because the two directions carry
+  different rules: a request is the input contract, with its validation and its strictness about
+  unknown fields; a response is built by the controller and validates nothing. A response shared
+  by two endpoints stays one class in `dto/response` — which is why `dto` is not grouped by use
+  case. A subpackage that starts holding a second concept is split in the same change that adds
+  it.
 - Besides the use cases, `service` MAY hold exactly one subpackage of shared write protections
   (`service/userwrite`, ADR-0040): what every write endpoint needs before it may write — the
   user's existence, the per-user lock, the idempotency claim. It is not a use case: it holds no
@@ -405,4 +429,4 @@ nobody measured costs that readability and buys nothing anyone can show.
 - Compliance is checked at plan time (Constitution Check) and at review. Runtime guidance for
   developers lives in `README.md` and `docs/adr/`.
 
-**Version**: 2.4.0 | **Ratified**: 2026-11-15 | **Last Amended**: 2026-11-17
+**Version**: 2.4.1 | **Ratified**: 2026-11-15 | **Last Amended**: 2026-11-17

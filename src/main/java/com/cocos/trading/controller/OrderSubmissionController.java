@@ -9,16 +9,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.cocos.trading.controller.dto.OrderResponse;
-import com.cocos.trading.controller.dto.OrderSubmissionRequest;
+import com.cocos.trading.controller.dto.request.OrderSubmissionRequest;
+import com.cocos.trading.controller.dto.response.OrderResponse;
 import com.cocos.trading.service.submission.OrderSubmissionService;
 import com.cocos.trading.service.submission.SubmissionRequest;
 
 @RestController
 @RequestMapping("/api/v1/users/{userId}/orders")
 class OrderSubmissionController {
-
-	private static final String IDEMPOTENCY_KEY = "Idempotency-Key";
 
 	private final OrderSubmissionService orderSubmissionService;
 
@@ -29,7 +27,7 @@ class OrderSubmissionController {
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
 	OrderResponse submit(@PathVariable long userId, @RequestBody OrderSubmissionRequest body,
-			@RequestHeader(name = IDEMPOTENCY_KEY, required = false) String idempotencyKey) {
+			@RequestHeader(name = IdempotencyHeader.NAME, required = false) String idempotencyKey) {
 		return OrderResponse.of(orderSubmissionService.submit(submissionOf(userId, body, idempotencyKey)));
 	}
 

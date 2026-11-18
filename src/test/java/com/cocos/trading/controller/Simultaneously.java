@@ -10,14 +10,14 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-final class Simultaneously {
+public final class Simultaneously {
 
 	private static final int DEADLINE_SECONDS = 30;
 
 	private Simultaneously() {
 	}
 
-	static <T> List<T> theseTwo(Callable<T> first, Callable<T> second) {
+	public static <T> List<T> theseTwo(Callable<T> first, Callable<T> second) {
 		ExecutorService threads = Executors.newFixedThreadPool(2);
 		try {
 			return bothOutcomesOf(threads, first, second);

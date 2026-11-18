@@ -33,7 +33,7 @@ Para conocer cuál es el valor de una cuenta se necesita saber:
   - filtra posiciones con cantidad 0. Es importante recorrer la historia porque si compraste y vendiste la misma cantidad, el promedio cambia: arrancás de 0.
     el promedio se reinicia al precio de la orden que cruzó y arranca del otro lado. De todas formas al calcular ganancia, no estamos calculando posiciones en short porque ahora mismo las tomamos como una anomalía.
 Pero si necesitáramos soportarlas, ya está listo el promedio del holding.
- 
+
 - Reserved shares: las órdenes que se prometieron vender. SELL LIMIT en NEW.
 
 De acá podemos derivar entonces:
@@ -148,4 +148,4 @@ Ya estuve revisando el código. Primeras impresiones: bien, pero hay algunas cos
 
    La carpeta de modelo también quedó muy bolsa de gatos, todo dentro de dos carpetas distintas. La reorganicé para juntar dentro de una misma carpeta lo que es cohesivo entre sí.
 
-Finalmente, como retrospectiva, quedo grande el feature con SDD. Creo que el endpoint de busqueda hubiera sido mas chico y mejor para empezar, asi se encaraba este de portfolio con una estructura ya armada sobre la cual basarse.
+Finalmente, como retrospectiva, quedó grande el feature con SDD. Creo que el endpoint de búsqueda hubiera sido más chico y mejor para empezar, así se encaraba este de portfolio con una estructura ya armada sobre la cual basarse.

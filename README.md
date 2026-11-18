@@ -14,7 +14,7 @@ behind the solution, not only the solution. So here is the map.
 | [`docs/challenge/`](docs/challenge) | The statement this solution answers, kept verbatim so requirements can be cited instead of paraphrased |
 | [`docs/journal/`](docs/journal) | **The intent journal. Start here.** Every decision, in the order it was taken, with what was known at the time |
 | [`docs/adr/`](docs/adr) | Architecture Decision Records: one file per decision, with the alternatives that were discarded |
-| [`docs/api/openapi.yaml`](docs/api/openapi.yaml) | The API contract as it is today. Every response in the web tests is validated against it (ADR-0024) |
+| [`docs/api/openapi.yaml`](docs/api/openapi.yaml) | The API contract as it is today. Every response in the web tests is validated against it (ADR-0024), and it can be imported to Postman as a collection |
 | [`docs/api/trading-api.http`](docs/api/trading-api.http) | Example requests with their expected figures, runnable from IntelliJ's HTTP Client or VS Code's REST Client |
 | [`specs/`](specs) | One folder per feature, written with Spec Kit before the code. Its `contracts/` keeps the API as that feature designed it, and is not edited afterwards |
 | `src/main/java` | Application code |
@@ -100,30 +100,6 @@ before loading them). If you have a database from before ADR-0029, recreate it o
 Every setting below is declared in `application.yaml` as `${ENVIRONMENT_VARIABLE:default}`, so the
 same image serves a different value with one `-e` and no rebuild.
 
-Paging is Spring Data's (ADR-0032): a `size` above the maximum is lowered to it, a `size` below 1
-falls back to the default, and a negative `page` is read as `0`. The limits are global — they apply
-to every endpoint that takes a `Pageable` — and the response echoes the `page` and `size` actually
-served:
-
-| Property | Default | Environment variable | What it does |
-|---|---|---|---|
-| `spring.data.web.pageable.default-page-size` | `20` | `SPRING_DATA_WEB_PAGEABLE_DEFAULT_PAGE_SIZE` | The page size applied when a request sends no `size` |
-| `spring.data.web.pageable.max-page-size` | `100` | `SPRING_DATA_WEB_PAGEABLE_MAX_PAGE_SIZE` | The largest page served. A larger `size` is **lowered to it** |
-| `trading.search.max-query-length` | `64` | `TRADING_SEARCH_MAX_QUERY_LENGTH` | The longest accepted `query`, measured after trimming. Above it the search is a `400` naming the limit |
-
-```bash
-SPRING_DATA_WEB_PAGEABLE_DEFAULT_PAGE_SIZE=5 docker compose --profile app up -d --build
-```
-
-The database access has a deadline and a bounded pool (ADR-0031). When either runs out the API
-answers `503` with a problem detail, instead of holding the request open:
-
-| Property | Default | Environment variable | What it does |
-|---|---|---|---|
-| `spring.transaction.default-timeout` | `10s` | `SPRING_TRANSACTION_DEFAULT_TIMEOUT` | The longest a request's transaction may run. Past it, the running query is cancelled |
-| `spring.datasource.hikari.maximum-pool-size` | `10` | `SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE` | Connections per instance. Times the number of instances, it must stay below the database's `max_connections` |
-| `spring.datasource.hikari.connection-timeout` | `5000` (ms) | `SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT` | The longest a request waits for a free connection. A plain number of milliseconds: Hikari does not read `5s` |
-
 ## Tests
 
 ```bash
@@ -143,8 +119,7 @@ through Testcontainers ([ADR-0010](docs/adr/0010-testcontainers-with-postgresql-
 response validated against `docs/api/openapi.yaml`
 ([ADR-0024](docs/adr/0024-every-response-is-validated-against-the-contract.md)). They cover all four
 submission paths, every refusal and every rejection, the two-thread concurrency race and the
-idempotent retry — the requested test, and more. The expected figures and how to reproduce them by
-hand are in [specs/003-order-placement/quickstart.md](specs/003-order-placement/quickstart.md).
+idempotent retry — the requested test, and more. 
 
 ## Endpoints
 
@@ -155,18 +130,6 @@ hand are in [specs/003-order-placement/quickstart.md](specs/003-order-placement/
 | `POST` | `/api/v1/users/{userId}/orders` | Submits one order, by an exact `size` or by a total `amount` in pesos — exactly one of the two — from which whole shares are derived by flooring, never a fraction. `MARKET` fills immediately at the last close; `LIMIT` is validated at the caller's own price and accepted as `NEW`, reserving the pesos or the shares it commits. An order the user cannot pay for, or whose shares they do not hold, is **stored** `REJECTED` with a machine-readable reason and answered `201`, like the other two: a rejection is a recorded outcome, a malformed request is not (ADR-0033). Submissions for one user are serialised on their `users` row, so two simultaneous orders cannot spend the same pesos ([ADR-0036](docs/adr/0036-submissions-are-serialised-per-user.md)). An optional `Idempotency-Key` header makes a retry of the same request return the first outcome instead of trading twice, without taking that lock at all; the same key with a different body is a `409` ([ADR-0037](docs/adr/0037-idempotent-submission-with-a-caller-key.md)) |
 | `POST` | `/api/v1/users/{userId}/cash-transfers` | Deposits (`CASH_IN`) or withdraws (`CASH_OUT`) a whole number of pesos. **An addition to the statement, not a departure from it**: the statement says transfers *can* be modelled as `CASH_IN`/`CASH_OUT` orders, and each transfer is stored as exactly that — one `MARKET` order on the `MONEDA` instrument at price `1`, the shape the provided dataset already uses ([ADR-0039](docs/adr/0039-a-transfer-is-a-market-order-on-the-cash-instrument.md)), so the portfolio counts it with no change. A deposit is always `FILLED`; a withdrawal is `FILLED` when *available* cash covers it and otherwise stored `REJECTED` with `INSUFFICIENT_FUNDS` and answered `201`, as an order is ([ADR-0038](docs/adr/0038-the-cash-transfer-endpoint-shape.md)). Its body is **closed** — any field besides `side` and `amount` is refused with `400` — while order submission's body ignores unknown fields. Transfers share the order endpoint's per-user lock and its `Idempotency-Key` namespace, both implemented once ([ADR-0040](docs/adr/0040-per-user-write-protection-lives-once.md)) |
 | `POST` | `/api/v1/users/{userId}/orders/{orderId}/cancel` | Cancels one of the user's orders that is still `NEW`, with no body, and answers `200` with the order as submission does, now `CANCELLED`; what it reserved is available again in the next portfolio read. **An addition the statement implies, not a departure from it**: the statement defines `CANCELLED` and says only `NEW` orders can be cancelled, but names no endpoint ([ADR-0041](docs/adr/0041-the-order-cancellation-endpoint-shape.md)). An order that is not `NEW` is a `409` and left as it was; an order of another user is the same `404` as one that does not exist. Cancellations share the per-user lock and the `Idempotency-Key` namespace of the other writes ([ADR-0040](docs/adr/0040-per-user-write-protection-lives-once.md)), and a keyed retry of any write answers its first outcome even if the order was cancelled since ([ADR-0043](docs/adr/0043-a-replay-answers-the-outcome-as-first-recorded.md)) |
-
-## One departure from the statement
-
-**A `MARKET` order for an instrument with no published price is refused with `400` and nothing is
-written, instead of being stored as a `REJECTED` order** ([ADR-0034](docs/adr/0034-an-unpriced-instrument-refuses-the-submission.md)).
-Three instruments in the provided dataset have no `marketdata` row (`PGR`, `IRCP`, and `ARS`, which
-is cash and refused anyway), and a `MARKET` order for one of them has no execution price to record.
-An instrument that does not quote is a property of the request, knowable before any of the user's
-money is considered — so refusing it keeps every row in `orders` priced and never writes a money
-figure as `0` when it is unknown ([ADR-0013](docs/adr/0013-unknown-money-is-absent-never-zero.md)).
-Every other rejection the statement asks for is stored. A `LIMIT` order for the same instrument is
-accepted: its price came in the request.
 
 ## Two things this API deliberately does not do
 
@@ -183,13 +146,3 @@ The statement, the schema and the seed data are not mine: they were provided by 
 published at https://github.com/cocos-capital/cocos-challenge. `docs/challenge/backend-challenge.md`
 is a verbatim copy of that statement, taken from commit `abae7701`, and the Flyway migrations under
 `src/main/resources/db/migration` are a transcription of that `database.sql`.
-
-<!-- ───────────── DELETE BEFORE DELIVERY ─────────────
-Pending, so the README never claims something that is not true yet:
- - the portfolio endpoint ships (feature 001-portfolio-endpoint) and instrument search ships
-   (feature 002-instrument-search); order submission and order cancellation are still a proposal
-   to be confirmed
- - `V2__portfolio_read_indexes.sql` adds the two `orders` indexes and the
-   `UNIQUE (instrumentid, date)` constraint on `marketdata`; instrument search needs no migration
-   (ADR-0027); there is still no migration for `order_status_history`
-──────────────────────────────────────────────────── -->
