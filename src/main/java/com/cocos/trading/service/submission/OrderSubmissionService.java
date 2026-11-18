@@ -2,9 +2,6 @@ package com.cocos.trading.service.submission;
 
 import static com.cocos.trading.service.submission.InvalidSubmissionException.refusing;
 
-import java.time.Clock;
-import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 
@@ -17,7 +14,6 @@ import com.cocos.trading.model.instrument.InstrumentRef;
 import com.cocos.trading.model.ledger.AccountLedger;
 import com.cocos.trading.model.ledger.AccountSnapshot;
 import com.cocos.trading.model.order.NewOrder;
-import com.cocos.trading.model.order.OrderStatus;
 import com.cocos.trading.model.order.RecordedTransition;
 import com.cocos.trading.model.submission.OrderDecision;
 import com.cocos.trading.model.submission.PricedSubmission;
@@ -28,8 +24,8 @@ import com.cocos.trading.persistence.OrderRepository;
 import com.cocos.trading.persistence.OrderStatusHistoryRepository;
 import com.cocos.trading.persistence.mapper.InstrumentMapper;
 import com.cocos.trading.persistence.mapper.MarketDataMapper;
-import com.cocos.trading.persistence.mapper.OrderMapper;
 import com.cocos.trading.service.userwrite.KeyedRequest;
+import com.cocos.trading.service.userwrite.LedgerClock;
 import com.cocos.trading.service.userwrite.UserWrite;
 
 @Service
@@ -46,11 +42,11 @@ public class OrderSubmissionService {
 
 	private final OrderStatusHistoryRepository orderStatusHistoryRepository;
 
-	private final Clock clock;
+	private final LedgerClock clock;
 
 	public OrderSubmissionService(UserWrite userWrite, InstrumentRepository instrumentRepository,
 			MarketDataRepository marketDataRepository, OrderRepository orderRepository,
-			OrderStatusHistoryRepository orderStatusHistoryRepository, Clock clock) {
+			OrderStatusHistoryRepository orderStatusHistoryRepository, LedgerClock clock) {
 		this.userWrite = userWrite;
 		this.instrumentRepository = instrumentRepository;
 		this.marketDataRepository = marketDataRepository;
@@ -72,7 +68,7 @@ public class OrderSubmissionService {
 
 		OrderDecision decision = refusing(() -> submission.decide(availabilityOf(userIdColumn)));
 
-		NewOrder order = submission.placedBy(requested.userId(), decision, now());
+		NewOrder order = submission.placedBy(requested.userId(), decision, clock.now());
 		Integer orderId = orderRepository.append(order);
 		orderStatusHistoryRepository.appendTransitionOf(orderId, order);
 		return SubmittedOrder.of(orderId, order);
@@ -101,13 +97,7 @@ public class OrderSubmissionService {
 	}
 
 	private AccountSnapshot availabilityOf(Integer userIdColumn) {
-		return new AccountLedger(OrderMapper.toOrders(
-				orderRepository.findOrdersOf(userIdColumn, OrderMapper.toStatusColumns(OrderStatus.contributing()))))
-			.snapshot();
-	}
-
-	private LocalDateTime now() {
-		return LocalDateTime.now(clock).truncatedTo(ChronoUnit.MICROS);
+		return new AccountLedger(orderRepository.contributingOrdersOf(userIdColumn)).snapshot();
 	}
 
 	private SubmittedOrder recordedOrder(Integer orderId) {

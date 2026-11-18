@@ -1,8 +1,5 @@
 package com.cocos.trading.service.userwrite;
 
-import java.time.Clock;
-import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
 
@@ -18,9 +15,9 @@ public class IdempotentWrite {
 
 	private final OrderIdempotencyRepository orderIdempotencyRepository;
 
-	private final Clock clock;
+	private final LedgerClock clock;
 
-	public IdempotentWrite(OrderIdempotencyRepository orderIdempotencyRepository, Clock clock) {
+	public IdempotentWrite(OrderIdempotencyRepository orderIdempotencyRepository, LedgerClock clock) {
 		this.orderIdempotencyRepository = orderIdempotencyRepository;
 		this.clock = clock;
 	}
@@ -38,7 +35,8 @@ public class IdempotentWrite {
 	}
 
 	private boolean claimed(KeyedRequest request, Integer userIdColumn) {
-		return orderIdempotencyRepository.claim(userIdColumn, request.keyValue(), request.fingerprintHex(), now());
+		return orderIdempotencyRepository.claim(userIdColumn, request.keyValue(), request.fingerprintHex(),
+				clock.now());
 	}
 
 	private <T extends WrittenOrder> T attachedTo(KeyedRequest request, Integer userIdColumn, T order) {
@@ -64,10 +62,6 @@ public class IdempotentWrite {
 		return orderIdempotencyRepository.orderIdOf(userIdColumn, request.keyValue())
 			.orElseThrow(() -> new IllegalStateException(
 					"the key " + request.keyValue() + " names no order, which a committed claim always does"));
-	}
-
-	private LocalDateTime now() {
-		return LocalDateTime.now(clock).truncatedTo(ChronoUnit.MICROS);
 	}
 
 }

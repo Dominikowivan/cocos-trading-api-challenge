@@ -1,7 +1,5 @@
 package com.cocos.trading.service.portfolio;
 
-import java.util.List;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -10,8 +8,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.cocos.trading.model.ledger.AccountLedger;
 import com.cocos.trading.model.ledger.AccountSnapshot;
-import com.cocos.trading.model.order.Order;
-import com.cocos.trading.model.order.OrderStatus;
 import com.cocos.trading.model.instrument.Closes;
 import com.cocos.trading.model.portfolio.Portfolio;
 import com.cocos.trading.model.user.UnknownUserException;
@@ -20,7 +16,6 @@ import com.cocos.trading.persistence.MarketDataRepository;
 import com.cocos.trading.persistence.OrderRepository;
 import com.cocos.trading.persistence.UserRepository;
 import com.cocos.trading.persistence.mapper.MarketDataMapper;
-import com.cocos.trading.persistence.mapper.OrderMapper;
 import com.cocos.trading.persistence.mapper.UserMapper;
 
 @Service
@@ -45,7 +40,7 @@ public class PortfolioService {
 	public Portfolio portfolioOf(UserId userId) {
 		Integer userIdColumn = requireExisting(userId);
 
-		AccountSnapshot snapshot = new AccountLedger(ordersOf(userIdColumn)).snapshot();
+		AccountSnapshot snapshot = new AccountLedger(orderRepository.contributingOrdersOf(userIdColumn)).snapshot();
 		Portfolio portfolio = Portfolio.valued(snapshot, latestClosesOf(snapshot));
 
 		reportAnomalies(userId, portfolio);
@@ -56,11 +51,6 @@ public class PortfolioService {
 		return UserMapper.toIdColumn(userId)
 			.filter(userRepository::existsById)
 			.orElseThrow(() -> new UnknownUserException(userId));
-	}
-
-	private List<Order> ordersOf(Integer userIdColumn) {
-		return OrderMapper.toOrders(
-				orderRepository.findOrdersOf(userIdColumn, OrderMapper.toStatusColumns(OrderStatus.contributing())));
 	}
 
 	private Closes latestClosesOf(AccountSnapshot snapshot) {

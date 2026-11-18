@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.cocos.trading.model.order.NewOrder;
+import com.cocos.trading.model.order.Order;
 import com.cocos.trading.model.order.OrderStatus;
 import com.cocos.trading.persistence.entity.OrderEntity;
 import com.cocos.trading.persistence.mapper.OrderMapper;
@@ -32,6 +33,10 @@ public interface OrderRepository extends JpaRepository<OrderEntity, Integer> {
 	@Modifying
 	@Query("update OrderEntity o set o.status = :to where o.id = :orderId and o.status = :from")
 	int updateStatus(@Param("orderId") Integer orderId, @Param("from") String from, @Param("to") String to);
+
+	default List<Order> contributingOrdersOf(Integer userId) {
+		return OrderMapper.toOrders(findOrdersOf(userId, OrderMapper.toStatusColumns(OrderStatus.contributing())));
+	}
 
 	default Optional<NewOrder> findPlacedOrder(Integer orderId) {
 		return findById(orderId).map(OrderMapper::toPlacedOrder);
