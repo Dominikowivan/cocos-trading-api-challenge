@@ -33,6 +33,26 @@ class OrderIdempotencySchemaTest extends PersistenceTestBase {
 	}
 
 	@Test
+	void v6_applied_on_top_of_v5() {
+		assertThat(migrations()).contains("6");
+	}
+
+	@Test
+	void two_claims_cannot_name_the_same_order() {
+		jdbcTemplate.update(claimOf(SEEDED_USER, "'first-key'", SEEDED_ORDER));
+
+		assertThatThrownBy(() -> jdbcTemplate.execute(claimOf(SEEDED_USER, "'second-key'", SEEDED_ORDER)))
+			.isInstanceOf(DataIntegrityViolationException.class);
+	}
+
+	@Test
+	void two_claims_with_no_order_yet_are_both_accepted() {
+		jdbcTemplate.update(claimOf(SEEDED_USER, "'claimed-a'", "NULL"));
+
+		assertThat(jdbcTemplate.update(claimOf(SEEDED_USER, "'claimed-b'", "NULL"))).isEqualTo(1);
+	}
+
+	@Test
 	void a_key_claimed_by_an_existing_user_is_accepted() {
 		assertThat(jdbcTemplate.update(claimOf(SEEDED_USER, "'a-key'", "NULL"))).isEqualTo(1);
 	}
@@ -86,8 +106,8 @@ class OrderIdempotencySchemaTest extends PersistenceTestBase {
 	}
 
 	@Test
-	void the_key_is_unique_per_user() {
-		assertThat(uniqueConstraintColumns()).containsExactlyInAnyOrder("userid", "idempotency_key");
+	void the_key_is_unique_per_user_and_the_order_is_unique_on_its_own() {
+		assertThat(uniqueConstraintColumns()).containsExactlyInAnyOrder("userid", "idempotency_key", "order_id");
 	}
 
 	@Test

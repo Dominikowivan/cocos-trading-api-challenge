@@ -123,6 +123,7 @@ answers `503` with a problem detail, instead of holding the request open:
 | `spring.transaction.default-timeout` | `10s` | `SPRING_TRANSACTION_DEFAULT_TIMEOUT` | The longest a request's transaction may run. Past it, the running query is cancelled |
 | `spring.datasource.hikari.maximum-pool-size` | `10` | `SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE` | Connections per instance. Times the number of instances, it must stay below the database's `max_connections` |
 | `spring.datasource.hikari.connection-timeout` | `5000` (ms) | `SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT` | The longest a request waits for a free connection. A plain number of milliseconds: Hikari does not read `5s` |
+| `spring.datasource.hikari.connection-init-sql` | `SET lock_timeout = 3s` | `TRADING_DB_LOCK_TIMEOUT` | The longest a request waits to acquire the per-user lock, below the transaction deadline so that a queued write fails for that reason and releases its connection (ADR-0046) |
 
 ## Tests
 

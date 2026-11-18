@@ -3,6 +3,9 @@
 - **Status:** Accepted
 - **Date:** 2026-11-17
 - **Journal:** [07OrderPlacement](../journal/07OrderPlacement.md)
+- **Corrected:** 2026-11-17 — the Decision said the lock is emitted as `FOR UPDATE`. It is not:
+  Hibernate emits `FOR NO KEY UPDATE`. The decision is unchanged and so is the behaviour; what was
+  wrong was the statement of fact, so it is fixed in place rather than left to mislead.
 
 ## Context
 
@@ -20,8 +23,8 @@ does not stop two writers from committing on top of the same snapshot.
 
 ## Decision
 
-**A submission's transaction begins with `SELECT … FROM users WHERE id = :id FOR UPDATE`, and runs
-at `READ COMMITTED`.**
+**A submission's transaction begins by locking the user's `users` row, and runs at
+`READ COMMITTED`.**
 
 - The lock is taken on the **`users` row**, as the first statement of the work, before the fold,
   the decision and the two inserts, so the endpoint can never fold a ledger it did not lock.
@@ -35,6 +38,19 @@ at `READ COMMITTED`.**
 - **A replayed idempotent retry never takes this lock at all**: it decides nothing and writes
   nothing, so it does not queue behind another submission for the same user
   ([ADR-0037](0037-idempotent-submission-with-a-caller-key.md)).
+- **The lock is emitted as `FOR NO KEY UPDATE`, not `FOR UPDATE`**, which is what Hibernate's
+  PostgreSQL dialect translates `PESSIMISTIC_WRITE` into. Measured, not assumed: the statement that
+  runs is `select ue1_0.id from users ue1_0 where ue1_0.id=? for no key update of ue1_0`. Three
+  consequences, each measured against PostgreSQL 18.7:
+  - it **conflicts with itself**, so two submissions for the same user still serialise — which is
+    the property this ADR buys, and the concurrency tests prove it end to end;
+  - it does **not** conflict with `FOR KEY SHARE`, the lock a foreign-key check takes, which is why
+    Hibernate picks it: a true `FOR UPDATE` would make every `INSERT INTO orders` for this user
+    queue behind the lock holder on the foreign-key check alone;
+  - therefore a transaction that wrote an order **without taking this lock would not be blocked by
+    it**. A `FOR UPDATE` would have blocked it. What closes that gap is not the lock but the
+    ArchUnit rule that only `service/userwrite` may take it ([ADR-0040](0040-per-user-write-protection-lives-once.md)):
+    the architectural rule carries part of the concurrency guarantee.
 - `OrderSubmissionService` is annotated `@Transactional(isolation = READ_COMMITTED)` — explicitly,
   although it is PostgreSQL's default, so the contrast with the `REPEATABLE_READ` reads is visible
   where it is chosen.
