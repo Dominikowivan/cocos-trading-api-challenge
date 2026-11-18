@@ -1,6 +1,6 @@
 # Cocos Trading API
 
-A broker API with four endpoints: a user's portfolio, instrument search, order submission and cancellation.
+A broker API with five endpoints: the three the statement asks for (a user's portfolio, instrument search and order submission), plus cash transfers and cancellation.
 
 Java 21 · Spring Boot 4.1.2 · PostgreSQL · Maven wrapper · Testcontainers
 
@@ -113,11 +113,6 @@ provided dataset (`db/seed/R__given_dataset.sql`, a repeatable migration that re
 before loading them). If you have a database from before ADR-0029, recreate it once with
 `docker compose down -v`.
 
-## Configuration
-
-Every setting below is declared in `application.yaml` as `${ENVIRONMENT_VARIABLE:default}`, so the
-same image serves a different value with one `-e` and no rebuild.
-
 ## Tests
 
 ```bash
@@ -137,7 +132,7 @@ through Testcontainers ([ADR-0010](docs/adr/0010-testcontainers-with-postgresql-
 response validated against `docs/api/openapi.yaml`
 ([ADR-0024](docs/adr/0024-every-response-is-validated-against-the-contract.md)). They cover all four
 submission paths, every refusal and every rejection, the two-thread concurrency race and the
-idempotent retry — the requested test, and more. 
+idempotent retry — the requested test, and more.
 
 ## Endpoints
 
@@ -154,9 +149,7 @@ idempotent retry — the requested test, and more.
 - **No matching engine.** A `LIMIT` order is born `NEW` and stays `NEW`; the only path out of that
   state is the user cancelling it. The statement says not to simulate the market, and that is
   exactly what this means — there is no order book, no counterparty and no partial fills.
-- **No authentication.** The statement does not ask for it, so the user is a path parameter. This
-  is the one decision in the repository that would not survive contact with production, and the
-  journal says what it would look like if it had to.
+- **No authentication.** The statement does not ask for it, so the user is a path parameter.
 
 ## Attribution
 
