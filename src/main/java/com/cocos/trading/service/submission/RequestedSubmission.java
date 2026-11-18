@@ -56,7 +56,9 @@ final class RequestedSubmission {
 		if (instrumentId == null) {
 			throw new InvalidSubmissionException("An order names the instrument it trades in 'instrumentId'");
 		}
-		if (instrumentId < 1 || instrumentId > Integer.MAX_VALUE) {
+		boolean cannotNameAStoredInstrument = instrumentId < 1 || instrumentId > Integer.MAX_VALUE;
+
+		if (cannotNameAStoredInstrument) {
 			throw new InvalidSubmissionException("No instrument with id " + instrumentId);
 		}
 		return instrumentId.intValue();

@@ -53,7 +53,9 @@ public record Portfolio(BigDecimal settledCash, BigDecimal availableCash, List<P
 	}
 
 	private static Optional<BigDecimal> totalReturnPercentOf(Holding holding, BigDecimal marketValue) {
-		if (holding.isShort() || holding.totalCost().signum() == 0) {
+		boolean hasNoCostBasisToCompareAgainst = holding.isShort() || holding.totalCost().signum() == 0;
+
+		if (hasNoCostBasisToCompareAgainst) {
 			return Optional.empty();
 		}
 		return Optional.of(DecimalPolicy.percent(marketValue.subtract(holding.totalCost()), holding.totalCost()));

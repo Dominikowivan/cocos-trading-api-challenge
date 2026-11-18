@@ -53,7 +53,10 @@ public final class CashTransfer {
 	}
 
 	private Optional<RejectionReason> shortfallIn(AccountSnapshot snapshot) {
-		if (direction == CashMovement.CASH_OUT && snapshot.availableCash().compareTo(amount) < 0) {
+		boolean withdrawalBeyondTheAvailableCash = direction == CashMovement.CASH_OUT
+				&& snapshot.availableCash().compareTo(amount) < 0;
+
+		if (withdrawalBeyondTheAvailableCash) {
 			return Optional.of(RejectionReason.INSUFFICIENT_FUNDS);
 		}
 		return Optional.empty();

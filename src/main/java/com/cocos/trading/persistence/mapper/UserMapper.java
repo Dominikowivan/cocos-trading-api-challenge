@@ -10,7 +10,9 @@ public final class UserMapper {
 	}
 
 	public static Optional<Integer> toIdColumn(UserId userId) {
-		if (userId.value() < Integer.MIN_VALUE || userId.value() > Integer.MAX_VALUE) {
+		boolean doesNotFitTheIdColumn = userId.value() < Integer.MIN_VALUE || userId.value() > Integer.MAX_VALUE;
+
+		if (doesNotFitTheIdColumn) {
 			return Optional.empty();
 		}
 		return Optional.of((int) userId.value());

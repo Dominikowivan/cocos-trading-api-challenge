@@ -60,7 +60,9 @@ public final class OrderMapper {
 	}
 
 	public static Optional<Integer> toIdColumn(long orderId) {
-		if (orderId < Integer.MIN_VALUE || orderId > Integer.MAX_VALUE) {
+		boolean doesNotFitTheIdColumn = orderId < Integer.MIN_VALUE || orderId > Integer.MAX_VALUE;
+
+		if (doesNotFitTheIdColumn) {
 			return Optional.empty();
 		}
 		return Optional.of((int) orderId);

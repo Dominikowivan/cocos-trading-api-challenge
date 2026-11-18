@@ -31,11 +31,15 @@ public record Order(long orderId, InstrumentRef instrument, LedgerSide side, Ord
 	}
 
 	public boolean reservesCash() {
-		return status.isOpen() && type == OrderType.LIMIT && side == OrderSide.BUY;
+		return isAnOpenLimit() && side == OrderSide.BUY;
 	}
 
 	public boolean reservesShares() {
-		return status.isOpen() && type == OrderType.LIMIT && side == OrderSide.SELL;
+		return isAnOpenLimit() && side == OrderSide.SELL;
+	}
+
+	private boolean isAnOpenLimit() {
+		return status.isOpen() && type == OrderType.LIMIT;
 	}
 
 	public BigDecimal committedAmount() {
